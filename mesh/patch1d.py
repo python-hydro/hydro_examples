@@ -53,39 +53,27 @@ class BCObject:
 
 
         # note: "reflect" is ambiguous and will be converted into
-        # either reflect-even (the default) or reflect-odd if
-        # odd_reflect_dir specifies the corresponding direction ("x",
-        # "y")
+        # either reflect-even (the default) or reflect-odd
+        if not xlb in valid and xrb in valid:
+            sys.exit("ERROR: invalid BC")
 
         # -x boundary
-        if xlb in valid:
-            self.xlb = xlb
-            if self.xlb == "reflect":
-                if odd_reflect_dir == "x":
-                    self.xlb = "reflect-odd"
-                else:
-                    self.xlb = "reflect-even"
-            
-        else:
-            sys.exit("ERROR: xlb = %s invalid BC" % (xlb))
+        self.xlb = xlb
+        if self.xlb == "reflect":
+            self.xlb = numpy.where(odd_reflect_dir == "x", 
+                                   "reflect-odd", "reflect-even")            
 
         # +x boundary
-        if xrb in valid:
-            self.xrb = xrb
-            if self.xrb == "reflect":
-                if odd_reflect_dir == "x":
-                    self.xrb = "reflect-odd"
-                else:
-                    self.xrb = "reflect-even"
-
-        else:
-            sys.exit("ERROR: xrb = %s invalid BC" % (xrb))
-
+        self.xrb = xrb
+        if self.xrb == "reflect":
+            self.xrb = numpy.where(odd_reflect_dir == "x",
+                                   "reflect-odd", "reflect-even")
 
         # periodic checks
         if ((xlb == "periodic" and not xrb == "periodic") or
             (xrb == "periodic" and not xlb == "periodic")):
             sys.exit("ERROR: both xlb and xrb must be periodic")
+
 
     def __str__(self):
         """ print out some basic information about the BC object """
@@ -148,30 +136,10 @@ class Grid1d:
         self.xr = (numpy.arange(nx+2*ng) + 1.0 - ng)*self.dx + xmin
         self.x = 0.5*(self.xl + self.xr)
 
-
-    def scratch_array(self, nvar=1):
-        """ 
-        return a standard numpy array dimensioned to have the size
-        and number of ghostcells as the parent grid
-        """
-        if nvar == 1:
-            return numpy.zeros((self.qx), dtype=dtype)
-        else:
-            return numpy.zeros((self.qx, nvar), dtype=dtype)
-
-
     def __str__(self):
         """ print out some basic information about the grid object """
 
         return "1-d grid: nx = " + `self.nx` + ", ng = " + `self.ng`
-
-
-    def __eq__(self, other):
-        """ are two grids equivalent? """
-        result = (self.nx == other.nx) and (self.ng == other.ng) and \
-                 (self.xmin == other.xmin) and (self.xmax == other.xmax)
-
-        return result
 
 
 class CellCenterData1d:
@@ -233,7 +201,6 @@ class CellCenterData1d:
         self.nvar += 1
 
         self.BCs[name] = bc_object
-
 
 
     def create(self):
