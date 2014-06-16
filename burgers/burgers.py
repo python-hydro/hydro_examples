@@ -1,5 +1,5 @@
-# 2nd-order accurate finite-volume implementation of the inviscid Burger's equation
-# with piecewise linear slope reconstruction
+# 2nd-order accurate finite-volume implementation of the inviscid Burger's 
+# equation with piecewise linear slope reconstruction
 # 
 # We are solving u_t + u u_x = 0 with outflow boundary conditions
 #
@@ -10,7 +10,16 @@ import pylab
 import math
 import sys
 
-class ccFVgrid:
+def minmod(a, b):
+    if (abs(a) < abs(b) and a*b > 0.0):
+        return a
+    elif (abs(b) < abs(a) and a*b > 0.0):
+        return b
+    else:
+        return 0.0
+
+
+class Grid1d:
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0):
 
@@ -33,11 +42,7 @@ class ccFVgrid:
         # storage for the solution
         self.u = numpy.zeros((nx+2*ng), dtype=numpy.float64)
 
-    def period(self, u):
-        """ return the period for advection with velocity u """
-        return (self.xmax - self.xmin)/u
-
-    def scratchArray(self):
+    def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
         return numpy.zeros((self.nx+2*self.ng), dtype=numpy.float64)
 
@@ -50,247 +55,174 @@ class ccFVgrid:
         # right boundary
         self.u[self.ihi+1:] = self.u[self.ihi]
 
+
+class Simulation:
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.t = 0.0
+
+        self.uinit = None
+    
+
     def initCond(self, type="tophat"):
 
         if type == "tophat":
-            self.u[numpy.logical_and(self.x >= 0.333, self.x <= 0.666)] = 1.0
+            self.grid.u[numpy.logical_and(self.grid.x >= 0.333, 
+                                          self.grid.x <= 0.666)] = 1.0
 
         elif type == "sine":
-            self.u[:] = 1.0
+            self.grid.u[:] = 1.0
 
-            index = numpy.logical_and(self.x >= 0.333, self.x <= 0.666)
-            self.u[index] += 0.5*numpy.sin(2.0*math.pi*(self.x[index]-0.333)/0.333)
+            index = numpy.logical_and(self.grid.x >= 0.333, 
+                                      self.grid.x <= 0.666)
+            self.grid.u[index] += \
+                0.5*numpy.sin(2.0*math.pi*(self.grid.x[index]-0.333)/0.333)
 
         elif type == "rarefaction":
-            self.u[:] = 1.0 
-            self.u[self.x > 0.5] = 2.0
+            self.grid.u[:] = 1.0 
+            self.grid.u[self.grid.x > 0.5] = 2.0
 
-        self.uinit = self.u.copy()
-
-    def norm(self, e):
-        """ return the norm of quantity e which lives on the grid """
-        if not len(e) == (2*self.ng + self.nx):
-            return None
-
-        return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
+        self.uinit = self.grid.u.copy()
 
 
-
-#-----------------------------------------------------------------------------
-# advection-specific routines
-
-def timestep(g, C):
-    return C*g.dx/max(abs(g.u[g.ilo:g.ihi+1]))
+    def timestep(self, C):
+        return C*self.grid.dx/max(abs(self.grid.u[self.grid.ilo:
+                                                  self.grid.ihi+1]))
 
 
-def states(g, dt, slopeType):
-    """ compute the left and right interface states """
+    def states(self, dt):
+        """ compute the left and right interface states """
 
-    # compute the piecewise linear slopes
-    slope = g.scratchArray()
+        # compute the piecewise linear slopes -- 2nd order MC limiter
+        ib = self.grid.ilo-1
+        ie = self.grid.ihi+1
 
+        u = self.grid.u
 
-    if slopeType == "godunov":
+        # this is the MC limiter from van Leer (1977), as given in 
+        # LeVeque (2002).  Note that this is slightly different than
+        # the expression from Colella (1990)
 
-        # piecewise constant = 0 slopes
-        slope[:] = 0.0
+        dc = self.grid.scratch_array()
+        dl = self.grid.scratch_array()
+        dr = self.grid.scratch_array()
 
-    elif slopeType == "centered":
+        dc[ib:ie+1] = 0.5*(u[ib+1:ie+2] - u[ib-1:ie ])
+        dl[ib:ie+1] = u[ib+1:ie+2] - u[ib  :ie+1]
+        dr[ib:ie+1] = u[ib  :ie+1] - u[ib-1:ie ]
 
-        # unlimited centered difference slopes
-
-        i = g.ilo-1
-        while (i <= g.ihi+1):
-            slope[i] = 0.5*(g.u[i+1] - g.u[i-1])/g.dx
-            i += 1
-
-    elif slopeType == "minmod":
-
-        # minmod limited slope
-
-        i = g.ilo-1
-        while (i <= g.ihi+1):
-            slope[i] = minmod( (g.u[i] - g.u[i-1])/g.dx, 
-                               (g.u[i+1] - g.u[i])/g.dx )
-            i += 1
+        # these where's do a minmod()
+        d1 = 2.0*numpy.where(numpy.fabs(dl) < numpy.fabs(dr), dl, dr)
+        d2 = numpy.where(numpy.fabs(dc) < numpy.fabs(d1), dc, d1)
+        ldeltau = numpy.where(dl*dr > 0.0, d2, 0.0)
         
-    elif slopeType == "MC":
+        # now the interface states.  Note that there are 1 more interfaces
+        # than zones
+        ul = g.scratch_array()
+        ur = g.scratch_array()
 
-        # MC limiter
+        ur[ib:ie+1] = u[ib:ie+1] - \
+                      0.5*(1.0 + u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1] 
 
-        i = g.ilo-1
-        while (i <= g.ihi+1):
-            slope[i] = minmod(minmod( 2.0*(g.u[i] - g.u[i-1])/g.dx, 
-                                      2.0*(g.u[i+1] - g.u[i])/g.dx ),
-                              0.5*(g.u[i+1] - g.u[i-1])/g.dx)
-            i += 1
+        ul[ib+1:ie+2] = u[ib:ie+1] + \
+                        0.5*(1.0 - u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1] 
 
-    elif slopeType == "superbee":
-
-        # superbee limiter
-
-        i = g.ilo-1
-        while (i <= g.ihi+1):
-            A = minmod( (g.u[i+1] - g.u[i])/g.dx,
-                        2.0*(g.u[i] - g.u[i-1])/g.dx )
-
-            B = minmod( (g.u[i] - g.u[i-1])/g.dx,
-                        2.0*(g.u[i+1] - g.u[i])/g.dx )
-            
-            slope[i] = maxmod(A, B)
-            i += 1
+        return ul, ur
 
 
+    def riemann(self, ul, ur):
+        """ 
+        Riemann problem for Burgers' equation.
+        """
 
-    # loop over all the interfaces.  Here, i refers to the left
-    # interface of the zone.  Note that thre are 1 more interfaces
-    # than zones
-    ul = g.scratchArray()
-    ur = g.scratchArray()
+        S = 0.5*(ul + ur)
+        ushock = numpy.where(S > 0.0, ul, ur)
+        ushock = numpy.where(S == 0.0, 0.0, ushock)
 
-    i = g.ilo
-    while (i <= g.ihi+1):
+        # rarefaction solution
+        urare = numpy.where(ur <= 0.0, ur, 0.0)
+        urare = numpy.where(ul >= 0.0, ul, urare)
 
-        # left state on the current interface comes from zone i-1
-        ul[i] = g.u[i-1] + 0.5*g.dx*(1.0 - g.u[i-1]*dt/g.dx)*slope[i-1]
+        us = numpy.where(ul > ur, ushock, urare)
 
-        # right state on the current interface comes from zone i
-        ur[i] = g.u[i] - 0.5*g.dx*(1.0 + g.u[i]*dt/g.dx)*slope[i]
-
-        i += 1
-
-    return ul, ur
+        return 0.5*us*us
 
 
-def riemann(g, ul, ur):
-    """ Riemann problem for advection -- this is simply upwinding,
-        but we return the flux """
+    def update(self, dt, flux):
+        """ conservative update """
 
-    f = g.scratchArray()
+        g = self.grid
 
-    i = g.ilo
-    while (i <= g.ihi+1):
+        unew = g.scratch_array()
 
-        if ul[i] > ur[i]:
+        unew[g.ilo:g.ihi+1] = g.u[g.ilo:g.ihi+1] + \
+            dt/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
 
-            # shock
-            S = 0.5*(ul[i] + ur[i])
-
-            if (S > 0):
-                us = ul[i]
-            elif (S < 0):
-                us = ur[i]
-            else:
-                f[i] = 0.0
+        return unew
 
 
-        else:
-            
-            # rarefaction
-            if ul[i] >= 0.0:
-                us = ul[i]
-            elif ur[i] <= 0.0:
-                us = ur[i]
-            else:
-                f[i] = 0.0
+    def evolve(self, C, tmax):
 
-        f[i] = 0.5*us*us
+        self.t = 0.0
 
-        i += 1
-    
-    return f
+        # main evolution loop
+        while (self.t < tmax):
 
+            # fill the boundary conditions
+            g.fillBCs()
 
-def update(g, dt, flux):
-    """ conservative update """
+            # get the timestep
+            dt = self.timestep(C)
 
-    anew = g.scratchArray()
+            if (self.t + dt > tmax):
+                dt = tmax - self.t
 
-    anew[g.ilo:g.ihi+1] = g.u[g.ilo:g.ihi+1] + \
-        dt/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
+            # get the interface states
+            ul, ur = self.states(dt)
 
-    return anew
-
-
-def evolve(nx, C, u, numPeriods, ICname, slopeType="centered"):
-
-    ng = 2
-
-    # create the grid
-    g = ccFVgrid(nx, ng)
-
-    t = 0.0
-    tmax = numPeriods*g.period(u)
-
-    # initialize the data
-    g.initCond(ICname)
-
-
-    # main evolution loop
-    while (t < tmax):
-
-        # fill the boundary conditions
-        g.fillBCs()
-
-        # get the timestep
-        dt = timestep(g, C)
-
-        if (t + dt > tmax):
-            dt = tmax - t
-
-        # get the interface states
-        ul, ur = states(g, dt, slopeType)
-
-        # solve the Riemann problem at all interfaces
-        flux = riemann(g, ul, ur)
+            # solve the Riemann problem at all interfaces
+            flux = self.riemann(ul, ur)
         
-        # do the conservative update
-        unew = update(g, dt, flux)
+            # do the conservative update
+            unew = self.update(dt, flux)
 
-        g.u[:] = unew[:]
+            self.grid.u[:] = unew[:]
 
-        t += dt
-
-
-    return g
-
-
-def minmod(a, b):
-    if (abs(a) < abs(b) and a*b > 0.0):
-        return a
-    elif (abs(b) < abs(a) and a*b > 0.0):
-        return b
-    else:
-        return 0.0
-
-def maxmod(a, b):
-    if (abs(a) > abs(b) and a*b > 0.0):
-        return a
-    elif (abs(b) > abs(a) and a*b > 0.0):
-        return b
-    else:
-        return 0.0
+            self.t += dt
 
 
 
 #-----------------------------------------------------------------------------
 # sine
 
-u = 1.0
+xmin = 0.0
+xmax = 1.0
 nx = 256
+ng = 2
+g = Grid1d(nx, ng)
+
+# maximum evolution time based on period for unit velocity
+tmax = (xmax - xmin)/1.0
+
 C = 0.8
 
 pylab.clf()
 
+s = Simulation(g)
+
 for i in range(0,10):
-    tend = (i+1)*0.02
-    g = evolve(nx, C, u, tend, "sine", slopeType="MC")
+    tend = (i+1)*0.02*tmax
+    s.initCond("sine")
+    s.evolve(C, tend)
 
     c = 1.0 - (0.1 + i*0.1)
+    g = s.grid
     pylab.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=`c`)
 
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+g = s.grid
+pylab.plot(g.x[g.ilo:g.ihi+1], s.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.xlabel("$x$")
 pylab.ylabel("$u$")
@@ -301,22 +233,32 @@ pylab.savefig("fv-burger-sine.eps")
 #-----------------------------------------------------------------------------
 # rarefaction
 
-u = 1.0
-nx = 128
+xmin = 0.0
+xmax = 1.0
+nx = 256
+ng = 2
+g = Grid1d(nx, ng)
+
+# maximum evolution time based on period for unit velocity
+tmax = (xmax - xmin)/1.0
+
 C = 0.8
 
 pylab.clf()
 
-for i in range(0,10):
-    tend = (i+1)*0.02
+s = Simulation(g)
 
-    g = evolve(nx, C, u, tend, "rarefaction", slopeType="MC")
+for i in range(0,10):
+    tend = (i+1)*0.02*tmax
+
+    s.initCond("rarefaction")
+    s.evolve(C, tend)
 
     c = 1.0 - (0.1 + i*0.1)
     pylab.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=`c`)
 
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], s.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.xlabel("$x$")
 pylab.ylabel("$u$")
