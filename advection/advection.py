@@ -36,11 +36,11 @@ class ccFVgrid:
         """ return the period for advection with velocity u """
         return (self.xmax - self.xmin)/u
 
-    def scratchArray(self):
+    def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
         return numpy.zeros((self.nx+2*self.ng), dtype=numpy.float64)
 
-    def fillBCs(self):
+    def fill_bc(self):
         """ fill all single ghostcell with periodic boundary conditions """
 
         # left boundary
@@ -55,7 +55,7 @@ class ccFVgrid:
             self.a[self.ihi+1+n] = self.a[self.ilo+n]
             n += 1
 
-    def initCond(self, type="tophat"):
+    def init_cond(self, type="tophat"):
 
         if type == "tophat":
             self.a[numpy.logical_and(self.x >= 0.333, self.x <= 0.666)] = 1.0
@@ -82,19 +82,19 @@ def timestep(g, C, u):
     return C*g.dx/u
 
 
-def states(g, dt, u, slopeType):
+def states(g, dt, u, slope_type):
     """ compute the left and right interface states """
 
     # compute the piecewise linear slopes
-    slope = g.scratchArray()
+    slope = g.scratch_array()
 
 
-    if slopeType == "godunov":
+    if slope_type == "godunov":
 
         # piecewise constant = 0 slopes
         slope[:] = 0.0
 
-    elif slopeType == "centered":
+    elif slope_type == "centered":
 
         # unlimited centered difference slopes
 
@@ -103,7 +103,7 @@ def states(g, dt, u, slopeType):
             slope[i] = 0.5*(g.a[i+1] - g.a[i-1])/g.dx
             i += 1
 
-    elif slopeType == "minmod":
+    elif slope_type == "minmod":
 
         # minmod limited slope
 
@@ -113,7 +113,7 @@ def states(g, dt, u, slopeType):
                                (g.a[i+1] - g.a[i])/g.dx )
             i += 1
         
-    elif slopeType == "MC":
+    elif slope_type == "MC":
 
         # MC limiter
 
@@ -124,7 +124,7 @@ def states(g, dt, u, slopeType):
                               0.5*(g.a[i+1] - g.a[i-1])/g.dx)
             i += 1
 
-    elif slopeType == "superbee":
+    elif slope_type == "superbee":
 
         # superbee limiter
 
@@ -144,8 +144,8 @@ def states(g, dt, u, slopeType):
     # loop over all the interfaces.  Here, i refers to the left
     # interface of the zone.  Note that thre are 1 more interfaces
     # than zones
-    al = g.scratchArray()
-    ar = g.scratchArray()
+    al = g.scratch_array()
+    ar = g.scratch_array()
 
     i = g.ilo
     while (i <= g.ihi+1):
@@ -174,7 +174,7 @@ def riemann(u, al, ar):
 def update(g, dt, flux):
     """ conservative update """
 
-    anew = g.scratchArray()
+    anew = g.scratch_array()
 
     anew[g.ilo:g.ihi+1] = g.a[g.ilo:g.ihi+1] + \
         dt/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
@@ -182,7 +182,7 @@ def update(g, dt, flux):
     return anew
 
 
-def evolve(nx, C, u, numPeriods, ICname, slopeType="centered"):
+def evolve(nx, C, u, numPeriods, problem_name, slope_type="centered"):
 
     ng = 2
 
@@ -193,14 +193,14 @@ def evolve(nx, C, u, numPeriods, ICname, slopeType="centered"):
     tmax = numPeriods*g.period(u)
 
     # initialize the data
-    g.initCond(ICname)
+    g.init_cond(problem_name)
 
 
     # main evolution loop
     while (t < tmax):
 
         # fill the boundary conditions
-        g.fillBCs()
+        g.fill_bc()
 
         # get the timestep
         dt = timestep(g, C, u)
@@ -209,7 +209,7 @@ def evolve(nx, C, u, numPeriods, ICname, slopeType="centered"):
             dt = tmax - t
 
         # get the interface states
-        al, ar = states(g, dt, u, slopeType)
+        al, ar = states(g, dt, u, slope_type)
 
         # solve the Riemann problem at all interfaces
         flux = riemann(u, al, ar)
@@ -320,7 +320,7 @@ u = 1.0
 nx = 128
 C = 0.8
 
-g = evolve(nx, C, u, 5, "gaussian", slopeType="godunov")
+g = evolve(nx, C, u, 5, "gaussian", slope_type="godunov")
 
 pylab.clf()
 
@@ -335,7 +335,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-gaussian-constant.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "gaussian", slopeType="centered")
+g = evolve(nx, C, u, 5, "gaussian", slope_type="centered")
 
 pylab.clf()
 
@@ -350,7 +350,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-gaussian-centered.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "gaussian", slopeType="minmod")
+g = evolve(nx, C, u, 5, "gaussian", slope_type="minmod")
 
 pylab.clf()
 
@@ -365,7 +365,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-gaussian-minmod.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "gaussian", slopeType="MC")
+g = evolve(nx, C, u, 5, "gaussian", slope_type="MC")
 
 pylab.clf()
 
@@ -380,7 +380,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-gaussian-MC.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "gaussian", slopeType="superbee")
+g = evolve(nx, C, u, 5, "gaussian", slope_type="superbee")
 
 pylab.clf()
 
@@ -402,7 +402,7 @@ u = 1.0
 nx = 128
 C = 0.8
 
-g = evolve(nx, C, u, 5, "tophat", slopeType="godunov")
+g = evolve(nx, C, u, 5, "tophat", slope_type="godunov")
 
 pylab.clf()
 
@@ -417,7 +417,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-tophat-constant.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "tophat", slopeType="centered")
+g = evolve(nx, C, u, 5, "tophat", slope_type="centered")
 
 pylab.clf()
 
@@ -432,7 +432,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-tophat-centered.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "tophat", slopeType="minmod")
+g = evolve(nx, C, u, 5, "tophat", slope_type="minmod")
 
 pylab.clf()
 
@@ -447,7 +447,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-tophat-minmod.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "tophat", slopeType="MC")
+g = evolve(nx, C, u, 5, "tophat", slope_type="MC")
 
 pylab.clf()
 
@@ -462,7 +462,7 @@ f.set_size_inches(6.0,7.0)
 pylab.savefig("fv-tophat-MC.png", bbox_inches="tight")
 
 
-g = evolve(nx, C, u, 5, "tophat", slopeType="superbee")
+g = evolve(nx, C, u, 5, "tophat", slope_type="superbee")
 
 pylab.clf()
 
