@@ -75,8 +75,8 @@ def advect(gr, u, S, dt):
     dr = gr.scratchArray()
 
     dc[ib:ie+1] = 0.5*numpy.fabs(u[ib+1:ie+2] - u[ib-1:ie ])
-    dl[ib:ie+1] = 0.5*numpy.fabs(u[ib+1:ie+2] - u[ib  :ie+1])
-    dr[ib:ie+1] = 0.5*numpy.fabs(u[ib  :ie+1] - u[ib-1:ie ])
+    dl[ib:ie+1] = numpy.fabs(u[ib+1:ie+2] - u[ib  :ie+1])
+    dr[ib:ie+1] = numpy.fabs(u[ib  :ie+1] - u[ib-1:ie ])
         
     minslope = numpy.minimum(dc, numpy.minimum(2.0*dl, 2.0*dr))
     ldeltau = numpy.where(test > 0.0, minslope, 0.0)*numpy.sign(dc)
@@ -180,7 +180,6 @@ class grid:
         u[:] = 0.0
         u[self.nx/2-0.15*self.nx:self.nx/2+0.15*self.nx+1] = 1.0
 
-        #u[:] = 1.0 + 0.5*numpy.sin(2.0*3*math.pi*self.x)*numpy.exp(-(self.x-0.5)**2/0.1**2)
         index = numpy.logical_and(self.x >= 0.333, self.x <= 0.666)
         u[:] = 1.0
         u[index] += 0.5*numpy.sin(2.0*math.pi*(self.x[index]-0.333)/0.333)
