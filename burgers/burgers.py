@@ -10,15 +10,6 @@ import pylab
 import math
 import sys
 
-def minmod(a, b):
-    if (abs(a) < abs(b) and a*b > 0.0):
-        return a
-    elif (abs(b) < abs(a) and a*b > 0.0):
-        return b
-    else:
-        return 0.0
-
-
 class Grid1d:
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0):
