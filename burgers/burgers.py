@@ -14,10 +14,11 @@ class Grid1d:
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0):
 
+        self.nx = nx
+        self.ng = ng
+
         self.xmin = xmin
         self.xmax = xmax
-        self.ng = ng
-        self.nx = nx
 
         # python is zero-based.  Make easy intergers to know where the
         # real data lives
@@ -27,17 +28,17 @@ class Grid1d:
         # physical coords -- cell-centered, left and right edges
         self.dx = (xmax - xmin)/(nx)
         self.x = xmin + (numpy.arange(nx+2*ng)-ng+0.5)*self.dx
-        self.xl = xmin + (numpy.arange(nx+2*ng)-ng)*self.dx
-        self.xr = xmin + (numpy.arange(nx+2*ng)-ng+1.0)*self.dx
 
         # storage for the solution
         self.u = numpy.zeros((nx+2*ng), dtype=numpy.float64)
+
 
     def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
         return numpy.zeros((self.nx+2*self.ng), dtype=numpy.float64)
 
-    def fillBCs(self):
+
+    def fill_BCs(self):
         """ fill all ghostcells with outflow """
 
         # left boundary
@@ -53,10 +54,8 @@ class Simulation:
         self.grid = grid
         self.t = 0.0
 
-        self.uinit = None
-    
 
-    def initCond(self, type="tophat"):
+    def init_cond(self, type="tophat"):
 
         if type == "tophat":
             self.grid.u[numpy.logical_and(self.grid.x >= 0.333, 
@@ -74,7 +73,6 @@ class Simulation:
             self.grid.u[:] = 1.0 
             self.grid.u[self.grid.x > 0.5] = 2.0
 
-        self.uinit = self.grid.u.copy()
 
 
     def timestep(self, C):
@@ -86,6 +84,8 @@ class Simulation:
         """ compute the left and right interface states """
 
         # compute the piecewise linear slopes -- 2nd order MC limiter
+        # we pick a range of cells that includes 1 ghost cell on either
+        # side
         ib = self.grid.ilo-1
         ie = self.grid.ihi+1
 
@@ -99,9 +99,9 @@ class Simulation:
         dl = self.grid.scratch_array()
         dr = self.grid.scratch_array()
 
-        dc[ib:ie+1] = 0.5*(u[ib+1:ie+2] - u[ib-1:ie ])
+        dc[ib:ie+1] = 0.5*(u[ib+1:ie+2] - u[ib-1:ie  ])
         dl[ib:ie+1] = u[ib+1:ie+2] - u[ib  :ie+1]
-        dr[ib:ie+1] = u[ib  :ie+1] - u[ib-1:ie ]
+        dr[ib:ie+1] = u[ib  :ie+1] - u[ib-1:ie  ]
 
         # these where's do a minmod()
         d1 = 2.0*numpy.where(numpy.fabs(dl) < numpy.fabs(dr), dl, dr)
@@ -113,12 +113,18 @@ class Simulation:
         ul = g.scratch_array()
         ur = g.scratch_array()
 
+        # are these indices right?
+        #
+        #  --+-----------------+------------------+
+        #     ^       i       ^ ^        i+1
+        #     ur(i)     ul(i+1) ur(i+1)
+        #       
         ur[ib:ie+1] = u[ib:ie+1] - \
                       0.5*(1.0 + u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1] 
 
         ul[ib+1:ie+2] = u[ib:ie+1] + \
-                        0.5*(1.0 - u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1] 
-
+                        0.5*(1.0 - u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1]
+ 
         return ul, ur
 
 
@@ -161,7 +167,7 @@ class Simulation:
         while (self.t < tmax):
 
             # fill the boundary conditions
-            g.fillBCs()
+            g.fill_BCs()
 
             # get the timestep
             dt = self.timestep(C)
@@ -204,7 +210,10 @@ s = Simulation(g)
 
 for i in range(0,10):
     tend = (i+1)*0.02*tmax
-    s.initCond("sine")
+    s.init_cond("sine")
+
+    uinit = s.grid.u.copy()
+
     s.evolve(C, tend)
 
     c = 1.0 - (0.1 + i*0.1)
@@ -213,7 +222,7 @@ for i in range(0,10):
 
 
 g = s.grid
-pylab.plot(g.x[g.ilo:g.ihi+1], s.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.xlabel("$x$")
 pylab.ylabel("$u$")
@@ -242,14 +251,17 @@ s = Simulation(g)
 for i in range(0,10):
     tend = (i+1)*0.02*tmax
 
-    s.initCond("rarefaction")
+    s.init_cond("rarefaction")
+
+    uinit = s.grid.u.copy()
+
     s.evolve(C, tend)
 
     c = 1.0 - (0.1 + i*0.1)
     pylab.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=`c`)
 
 
-pylab.plot(g.x[g.ilo:g.ihi+1], s.uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.xlabel("$x$")
 pylab.ylabel("$u$")
