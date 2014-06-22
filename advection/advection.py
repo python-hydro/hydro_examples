@@ -92,6 +92,7 @@ class Simulation:
     def init_cond(self, type="tophat"):
 
         if type == "tophat":
+            self.grid.a[:] = 0.0
             self.grid.a[numpy.logical_and(self.grid.x >= 0.333, 
                                           self.grid.x <= 0.666)] = 1.0
 
@@ -438,81 +439,91 @@ pylab.savefig("fv-gaussian-limiters.png", bbox_inches="tight")
 #-----------------------------------------------------------------------------
 # tophat -- different limiters
 
-u = 1.0
-nx = 128
-C = 0.8
-
-g = evolve(nx, C, u, 5, "tophat", slope_type="godunov")
-
 pylab.clf()
 
+xmin = 0.0
+xmax = 1.0
+nx = 128
+ng = 2
+
+C = 0.8
+u = 1.0
+
+g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+
+s = Simulation(g, u, slope_type="godunov")
+s.init_cond("tophat")
+ainit = s.grid.a.copy()
+
+s.evolve(C, num_periods=5)
+
+pylab.subplot(231)
+
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.title("piecewise constant")
 
-f = pylab.gcf()
-f.set_size_inches(6.0,7.0)
 
-pylab.savefig("fv-tophat-constant.png", bbox_inches="tight")
+s = Simulation(g, u, slope_type="centered")
+s.init_cond("tophat")
+ainit = s.grid.a.copy()
 
+s.evolve(C, num_periods=5)
 
-g = evolve(nx, C, u, 5, "tophat", slope_type="centered")
-
-pylab.clf()
+pylab.subplot(232)
 
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.title("centered (unlimited)")
 
-f = pylab.gcf()
-f.set_size_inches(6.0,7.0)
 
-pylab.savefig("fv-tophat-centered.png", bbox_inches="tight")
+s = Simulation(g, u, slope_type="minmod")
+s.init_cond("tophat")
+ainit = s.grid.a.copy()
 
+s.evolve(C, num_periods=5)
 
-g = evolve(nx, C, u, 5, "tophat", slope_type="minmod")
-
-pylab.clf()
+pylab.subplot(233)
 
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.title("minmod limiter")
 
-f = pylab.gcf()
-f.set_size_inches(6.0,7.0)
 
-pylab.savefig("fv-tophat-minmod.png", bbox_inches="tight")
+s = Simulation(g, u, slope_type="MC")
+s.init_cond("tophat")
+ainit = s.grid.a.copy()
 
+s.evolve(C, num_periods=5)
 
-g = evolve(nx, C, u, 5, "tophat", slope_type="MC")
-
-pylab.clf()
+pylab.subplot(234)
 
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.title("MC limiter")
 
-f = pylab.gcf()
-f.set_size_inches(6.0,7.0)
 
-pylab.savefig("fv-tophat-MC.png", bbox_inches="tight")
+s = Simulation(g, u, slope_type="superbee")
+s.init_cond("tophat")
+ainit = s.grid.a.copy()
 
+s.evolve(C, num_periods=5)
 
-g = evolve(nx, C, u, 5, "tophat", slope_type="superbee")
-
-pylab.clf()
+pylab.subplot(235)
 
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
 pylab.title("superbee limiter")
 
+
 f = pylab.gcf()
-f.set_size_inches(6.0,7.0)
+f.set_size_inches(10.0,7.0)
 
-pylab.savefig("fv-tophat-superbee.png", bbox_inches="tight")
+pylab.tight_layout()
 
+pylab.savefig("fv-tophat-limiters.png", bbox_inches="tight")
