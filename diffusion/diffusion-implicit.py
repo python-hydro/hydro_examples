@@ -56,7 +56,7 @@ class Grid1d:
 
 
 def phi_a(t, k, x, xc, t0, phi1, phi2):
-    """ analytic solution """
+    """ analytic solution for the diffusion of a Gaussian """
 
     return (phi2 - phi1)*numpy.sqrt(t0/(t + t0)) * \
         numpy.exp(-0.25*(x-xc)**2/(k*(t + t0))) + phi1
@@ -64,12 +64,23 @@ def phi_a(t, k, x, xc, t0, phi1, phi2):
 
 class Simulation:
 
-    def __init__(self, grid):
+    def __init__(self, grid, k=1.0):
         self.grid = grid
         self.t = 0.0
+        self.k = k  # diffusion coefficient
 
 
-    def diffuseCN(self, k, dt):
+    def init_cond(self, name, *args):
+
+        if name == "gaussian":
+
+            # initialize the data
+            xc = 0.5*(self.grid.xmin + self.grid.xmax)
+            t0, phi1, phi2 = args
+            self.grid.phi[:] = phi_a(0.0, self.k, self.grid.x, xc, t0, phi1, phi2)
+
+
+    def diffuseCN(self, dt):
         """ 
         diffuse phi implicitly through timestep dt, with a C-N
         temporal discretization 
@@ -80,11 +91,11 @@ class Simulation:
 
         phinew = gr.scratch_array()
     
-        alpha = k*dt/gr.dx**2
+        alpha = self.k*dt/gr.dx**2
 
         # create the RHS of the matrix
         gr.fillBC()
-        R = 0.5*k*dt*self.lap()
+        R = 0.5*self.k*dt*self.lap()
         R = R[gr.ilo:gr.ihi+1]
         R += phi[gr.ilo:gr.ihi+1] 
     
@@ -133,7 +144,7 @@ class Simulation:
         return lapphi
 
 
-    def evolve(self, k, t0, phi1, phi2, C, tmax):
+    def evolve(self, C, tmax):
         """ 
         the main evolution loop.  Evolve 
         
@@ -145,11 +156,7 @@ class Simulation:
         gr = self.grid
 
         # time info
-        dt = C*0.5*gr.dx**2/k
-
-        # initialize the data
-        xc = 0.5*(gr.xmin + gr.xmax)
-        gr.phi[:] = phi_a(0.0, k, gr.x, xc, t0, phi1, phi2)
+        dt = C*0.5*gr.dx**2/self.k
 
         while (self.t < tmax):
 
@@ -160,7 +167,7 @@ class Simulation:
                 dt = tmax - self.t
 
             # diffuse for dt
-            phinew = self.diffuseCN(k, dt)
+            phinew = self.diffuseCN(dt)
 
             gr.phi[:] = phinew[:]
 
@@ -168,10 +175,11 @@ class Simulation:
 
 
 
-#-----------------------------------------------------------------------------
-# Convergence
 
-# a characteristic timescale for diffusion if L^2/k
+#-----------------------------------------------------------------------------
+# Convergence of a Gaussian
+
+# a characteristic timescale for diffusion is L^2/k
 tmax = 0.005
 
 t0 = 1.e-4
@@ -194,8 +202,9 @@ for nx in N:
 
     # the present C-N discretization
     g = Grid1d(nx, ng=1)
-    s = Simulation(g)
-    s.evolve(k, t0, phi1, phi2, C, tmax)
+    s = Simulation(g, k=k)
+    s.init_cond("gaussian", t0, phi1, phi2)
+    s.evolve(C, tmax)
     
     xc = 0.5*(g.xmin + g.xmax)
     phi_analytic = phi_a(tmax, k, g.x, xc, t0, phi1, phi2)
