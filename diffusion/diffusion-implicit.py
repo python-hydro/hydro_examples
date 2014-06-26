@@ -158,7 +158,7 @@ class Simulation:
         # time info
         dt = C*0.5*gr.dx**2/self.k
 
-        while (self.t < tmax):
+        while self.t < tmax:
 
             gr.fillBC()
 
@@ -234,11 +234,11 @@ pylab.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}
 
 pylab.xlabel(r"$N$")
 pylab.ylabel(r"L2 norm of absolute error")
-pylab.title("Convergence of Diffusion Methods, C = %3.2f, t = %5.2g" % (C, tmax))
+pylab.title("Convergence of C-N Implicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
 
 pylab.ylim(1.e-6, 1.e-2)
 pylab.legend(frameon=False, fontsize="small")
 
-pylab.savefig("diffmethods-converge-{}.png".format(C))
+pylab.savefig("diffimplicit-converge-{}.png".format(C))
 
 
