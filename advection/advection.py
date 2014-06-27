@@ -1,15 +1,29 @@
-# 2nd-order accurate finite-volume implementation of linear advection with 
-# piecewise linear slope reconstruction
-# 
-# We are solving a_t + u a_x = 0
-#
-# M. Zingale (2013-03-24)
+"""
+2nd-order accurate finite-volume implementation of linear advection with 
+piecewise linear slope reconstruction.
+
+We are solving a_t + u a_x = 0
+
+This script defines two classes:
+
+ -- the Grid1d class that manages a cell-centered grid and holds the 
+    data that lives on that grid
+
+ -- the Simulation class that is built on a Grid1d object and defines
+    everything needed to do a advection.
+
+Options for several different slope limiters are provided.
+
+M. Zingale
+
+"""
 
 import numpy
 import pylab
 import math
 
 
+# helper functions for the limiting
 def minmod(a, b):
     if (abs(a) < abs(b) and a*b > 0.0):
         return a
@@ -58,15 +72,12 @@ class Grid1d:
     def fill_BCs(self):
         """ fill all single ghostcell with periodic boundary conditions """
 
-        # left boundary
         n = 0
         while n < self.ng:
+            # left boundary
             self.a[self.ilo-1-n] = self.a[self.ihi-n]
-            n += 1
 
-        # right boundary
-        n = 0
-        while n < self.ng:
+            # right boundary
             self.a[self.ihi+1+n] = self.a[self.ilo+n]
             n += 1
 
@@ -79,18 +90,18 @@ class Grid1d:
         return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
 
 
-
 class Simulation:
 
-    def __init__(self, grid, u, slope_type="centered"):
+    def __init__(self, grid, u, C=0.8, slope_type="centered"):
         self.grid = grid
-        self.t = 0.0
+        self.t = 0.0 # simulation time
         self.u = u   # the constant advective velocity
+        self.C = C   # CFL number
         self.slope_type = slope_type
 
 
     def init_cond(self, type="tophat"):
-
+        """ initialize the data """
         if type == "tophat":
             self.grid.a[:] = 0.0
             self.grid.a[numpy.logical_and(self.grid.x >= 0.333, 
@@ -103,8 +114,9 @@ class Simulation:
             self.grid.a[:] = 1.0 + numpy.exp(-60.0*(self.grid.x - 0.5)**2)
 
 
-    def timestep(self, C):
-        return C*self.grid.dx/self.u
+    def timestep(self):
+        """ return the advective timestep """
+        return self.C*self.grid.dx/self.u
 
 
     def period(self):
@@ -214,8 +226,8 @@ class Simulation:
         return anew
 
 
-    def evolve(self, C, num_periods=1):
-
+    def evolve(self, num_periods=1):
+        """ evolve the linear advection equation """
         self.t = 0.0
         g = self.grid
 
@@ -229,7 +241,7 @@ class Simulation:
             g.fill_BCs()
 
             # get the timestep
-            dt = self.timestep(C)
+            dt = self.timestep()
 
             if (self.t + dt > tmax):
                 dt = tmax - self.t
@@ -258,12 +270,11 @@ ng = 2
 g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
 u = 1.0
-s = Simulation(g, u, slope_type="minmod")
+s = Simulation(g, u, C=0.8, slope_type="minmod")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-C = 0.8
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
 pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
@@ -281,12 +292,11 @@ ng = 2
 g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
 u = 1.0
-s = Simulation(g, u, slope_type="minmod")
+s = Simulation(g, u, C=0.8, slope_type="minmod")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-C = 0.8
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.clf()
 
@@ -313,12 +323,11 @@ for nx in N:
     g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
     u = 1.0
-    s = Simulation(g, u, slope_type="centered")
+    s = Simulation(g, u, C=0.8, slope_type="centered")
     s.init_cond("gaussian")
     ainit = s.grid.a.copy()
 
-    C = 0.8
-    s.evolve(C, num_periods=5)
+    s.evolve(num_periods=5)
 
     # compute the error
     err.append(g.norm(g.a - ainit))
@@ -353,16 +362,15 @@ xmax = 1.0
 nx = 128
 ng = 2
 
-C = 0.8
 u = 1.0
 
 g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
-s = Simulation(g, u, slope_type="godunov")
+s = Simulation(g, u, C=0.8, slope_type="godunov")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(231)
 
@@ -372,11 +380,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("piecewise constant")
 
 
-s = Simulation(g, u, slope_type="centered")
+s = Simulation(g, u, C=0.8, slope_type="centered")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(232)
 
@@ -386,11 +394,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("centered (unlimited)")
 
 
-s = Simulation(g, u, slope_type="minmod")
+s = Simulation(g, u, C=0.8, slope_type="minmod")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(233)
 
@@ -400,11 +408,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("minmod limiter")
 
 
-s = Simulation(g, u, slope_type="MC")
+s = Simulation(g, u, C=0.8, slope_type="MC")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(234)
 
@@ -414,11 +422,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("MC limiter")
 
 
-s = Simulation(g, u, slope_type="superbee")
+s = Simulation(g, u, C=0.8, slope_type="superbee")
 s.init_cond("gaussian")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(235)
 
@@ -451,11 +459,11 @@ u = 1.0
 
 g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
-s = Simulation(g, u, slope_type="godunov")
+s = Simulation(g, u, C=0.8, slope_type="godunov")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(231)
 
@@ -465,11 +473,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("piecewise constant")
 
 
-s = Simulation(g, u, slope_type="centered")
+s = Simulation(g, u, C=0.8, slope_type="centered")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(232)
 
@@ -479,11 +487,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("centered (unlimited)")
 
 
-s = Simulation(g, u, slope_type="minmod")
+s = Simulation(g, u, C=0.8, slope_type="minmod")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(233)
 
@@ -493,11 +501,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("minmod limiter")
 
 
-s = Simulation(g, u, slope_type="MC")
+s = Simulation(g, u, C=0.8, slope_type="MC")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(234)
 
@@ -507,11 +515,11 @@ pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 pylab.title("MC limiter")
 
 
-s = Simulation(g, u, slope_type="superbee")
+s = Simulation(g, u, C=0.8, slope_type="superbee")
 s.init_cond("tophat")
 ainit = s.grid.a.copy()
 
-s.evolve(C, num_periods=5)
+s.evolve(num_periods=5)
 
 pylab.subplot(235)
 
