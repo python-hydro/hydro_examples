@@ -260,278 +260,145 @@ class Simulation:
             self.t += dt
 
 
-#-----------------------------------------------------------------------------
-# tophat
+if __name__ == "__main__":
 
-xmin = 0.0
-xmax = 1.0
-nx = 64
-ng = 2
-g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+    #-------------------------------------------------------------------------
+    # convergence test
+    problem = "gaussian"
 
-u = 1.0
-s = Simulation(g, u, C=0.8, slope_type="minmod")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
+    xmin = 0.0
+    xmax = 1.0
+    ng = 2
+    N = [32, 64, 128, 256]
 
-s.evolve(num_periods=5)
+    err = []
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+    for nx in N:
 
-pylab.savefig("fv-advect-tophat.png")
+        g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
+        u = 1.0
+        s = Simulation(g, u, C=0.8, slope_type="centered")
+        s.init_cond("gaussian")
+        ainit = s.grid.a.copy()
 
-#-----------------------------------------------------------------------------
-# gaussian
+        s.evolve(num_periods=5)
 
-xmin = 0.0
-xmax = 1.0
-nx = 64
-ng = 2
-g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
-
-u = 1.0
-s = Simulation(g, u, C=0.8, slope_type="minmod")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.clf()
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.savefig("fv-advect-gaussian.png")
+        # compute the error
+        err.append(g.norm(g.a - ainit))
+        print g.dx, nx, err[-1]
 
 
+    pylab.clf()
 
-#-----------------------------------------------------------------------------
-# convergence test
-problem = "gaussian"
+    N = numpy.array(N, dtype=numpy.float64)
+    err = numpy.array(err)
 
-xmin = 0.0
-xmax = 1.0
-ng = 2
-N = [32, 64, 128, 256]
+    pylab.scatter(N, err, color="r")
+    pylab.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
+               color="k", label="2nd order convergence")
 
-err = []
+    ax = pylab.gca()
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
+    pylab.xlabel("N")
+    pylab.ylabel("absolute error")
 
-for nx in N:
+    pylab.legend(frameon=False, fontsize="small")
+    
+    pylab.savefig("plm-converge.png")
 
-    g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+
+    #-----------------------------------------------------------------------------
+    # different limiters: run both the Gaussian and tophat
+
+    xmin = 0.0
+    xmax = 1.0
+    nx = 128
+    ng = 2
 
     u = 1.0
-    s = Simulation(g, u, C=0.8, slope_type="centered")
-    s.init_cond("gaussian")
-    ainit = s.grid.a.copy()
 
-    s.evolve(num_periods=5)
+    g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
-    # compute the error
-    err.append(g.norm(g.a - ainit))
-    print g.dx, nx, err[-1]
+    for p in ["gaussian", "tophat"]:
+        pylab.clf()
 
+        s = Simulation(g, u, C=0.8, slope_type="godunov")
+        s.init_cond(p)
+        ainit = s.grid.a.copy()
 
-pylab.clf()
+        s.evolve(num_periods=5)
 
-N = numpy.array(N, dtype=numpy.float64)
-err = numpy.array(err)
+        pylab.subplot(231)
 
-pylab.scatter(N, err, color="r")
-pylab.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="2nd order convergence")
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-ax = pylab.gca()
-ax.set_xscale('log')
-ax.set_yscale('log')
+        pylab.title("piecewise constant")
 
-pylab.xlabel("N")
-pylab.ylabel("absolute error")
 
-pylab.legend(frameon=False, fontsize="small")
+        s = Simulation(g, u, C=0.8, slope_type="centered")
+        s.init_cond(p)
+        ainit = s.grid.a.copy()
 
-pylab.savefig("plm-converge.png")
+        s.evolve(num_periods=5)
 
+        pylab.subplot(232)
+        
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-#-----------------------------------------------------------------------------
-# gaussian -- different limiters
+        pylab.title("centered (unlimited)")
 
-xmin = 0.0
-xmax = 1.0
-nx = 128
-ng = 2
 
-u = 1.0
+        s = Simulation(g, u, C=0.8, slope_type="minmod")
+        s.init_cond(p)
+        ainit = s.grid.a.copy()
 
-g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        s.evolve(num_periods=5)
 
-s = Simulation(g, u, C=0.8, slope_type="godunov")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
+        pylab.subplot(233)
 
-s.evolve(num_periods=5)
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        
+        pylab.title("minmod limiter")
 
-pylab.subplot(231)
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        s = Simulation(g, u, C=0.8, slope_type="MC")
+        s.init_cond(p)
+        ainit = s.grid.a.copy()
 
-pylab.title("piecewise constant")
+        s.evolve(num_periods=5)
 
+        pylab.subplot(234)
 
-s = Simulation(g, u, C=0.8, slope_type="centered")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-s.evolve(num_periods=5)
+        pylab.title("MC limiter")
 
-pylab.subplot(232)
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        s = Simulation(g, u, C=0.8, slope_type="superbee")
+        s.init_cond(p)
+        ainit = s.grid.a.copy()
 
-pylab.title("centered (unlimited)")
+        s.evolve(num_periods=5)
 
+        pylab.subplot(235)
 
-s = Simulation(g, u, C=0.8, slope_type="minmod")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-s.evolve(num_periods=5)
+        pylab.title("superbee limiter")
 
-pylab.subplot(233)
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        f = pylab.gcf()
+        f.set_size_inches(10.0,7.0)
 
-pylab.title("minmod limiter")
+        pylab.tight_layout()
+        
+        pylab.savefig("fv-{}-limiters.png".format(p), bbox_inches="tight")
 
-
-s = Simulation(g, u, C=0.8, slope_type="MC")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(234)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("MC limiter")
-
-
-s = Simulation(g, u, C=0.8, slope_type="superbee")
-s.init_cond("gaussian")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(235)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("superbee limiter")
-
-
-f = pylab.gcf()
-f.set_size_inches(10.0,7.0)
-
-pylab.tight_layout()
-
-pylab.savefig("fv-gaussian-limiters.png", bbox_inches="tight")
-
-
-#-----------------------------------------------------------------------------
-# tophat -- different limiters
-
-pylab.clf()
-
-xmin = 0.0
-xmax = 1.0
-nx = 128
-ng = 2
-
-C = 0.8
-u = 1.0
-
-g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
-
-s = Simulation(g, u, C=0.8, slope_type="godunov")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(231)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("piecewise constant")
-
-
-s = Simulation(g, u, C=0.8, slope_type="centered")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(232)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("centered (unlimited)")
-
-
-s = Simulation(g, u, C=0.8, slope_type="minmod")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(233)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("minmod limiter")
-
-
-s = Simulation(g, u, C=0.8, slope_type="MC")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(234)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("MC limiter")
-
-
-s = Simulation(g, u, C=0.8, slope_type="superbee")
-s.init_cond("tophat")
-ainit = s.grid.a.copy()
-
-s.evolve(num_periods=5)
-
-pylab.subplot(235)
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-
-pylab.title("superbee limiter")
-
-
-f = pylab.gcf()
-f.set_size_inches(10.0,7.0)
-
-pylab.tight_layout()
-
-pylab.savefig("fv-tophat-limiters.png", bbox_inches="tight")
