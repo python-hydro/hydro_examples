@@ -343,7 +343,8 @@ if __name__ == "__main__":
     ax.set_yscale('log')
     
     pylab.xlabel("N")
-    pylab.ylabel("absolute error")
+    pylab.ylabel(r"$\|\| a^\mathrm{final} - a^\mathrm{init} \|\|_2$", 
+                 fontsize=16)
 
     pylab.legend(frameon=False)
     
