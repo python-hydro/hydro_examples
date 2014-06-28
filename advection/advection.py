@@ -262,6 +262,46 @@ class Simulation:
 
 if __name__ == "__main__":
 
+
+    #-------------------------------------------------------------------------
+    # compare limiting and no-limiting
+
+    xmin = 0.0
+    xmax = 1.0
+    nx = 64
+    ng = 2
+
+    g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+
+    u = 1.0
+
+    s = Simulation(g, u, C=0.7, slope_type="centered")
+    s.init_cond("tophat")
+    ainit = s.grid.a.copy()
+    s.evolve(num_periods=5)
+
+    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
+               color="r", label="unlimited")
+
+    s = Simulation(g, u, C=0.7, slope_type="minmod")
+    s.init_cond("tophat")
+    s.evolve(num_periods=5)
+
+    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
+               color="b", label="minmod limiter")
+
+    pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], 
+               ls=":", color="0.5", label="exact")
+
+    pylab.legend(frameon=False, loc="best")
+
+    pylab.xlabel(r"$x$")
+    pylab.ylabel(r"$a$")
+
+    pylab.savefig("fv-advect.eps")
+
+
+
     #-------------------------------------------------------------------------
     # convergence test
     problem = "gaussian"
@@ -310,7 +350,7 @@ if __name__ == "__main__":
     pylab.savefig("plm-converge.png")
 
 
-    #-----------------------------------------------------------------------------
+    #-------------------------------------------------------------------------
     # different limiters: run both the Gaussian and tophat
 
     xmin = 0.0
