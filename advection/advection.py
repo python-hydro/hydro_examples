@@ -309,7 +309,7 @@ if __name__ == "__main__":
     xmin = 0.0
     xmax = 1.0
     ng = 2
-    N = [32, 64, 128, 256]
+    N = [32, 64, 128, 256, 512]
 
     err = []
 
@@ -336,7 +336,7 @@ if __name__ == "__main__":
 
     pylab.scatter(N, err, color="r")
     pylab.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
-               color="k", label="2nd order convergence")
+               color="k", label=r"$\mathcal{O}(\Delta x^2)$")
 
     ax = pylab.gca()
     ax.set_xscale('log')
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     pylab.xlabel("N")
     pylab.ylabel("absolute error")
 
-    pylab.legend(frameon=False, fontsize="small")
+    pylab.legend(frameon=False)
     
     pylab.savefig("plm-converge.png")
 
