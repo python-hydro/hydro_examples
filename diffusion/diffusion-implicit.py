@@ -198,8 +198,6 @@ err = []
 
 for nx in N:
 
-    print nx
-
     # the present C-N discretization
     g = Grid1d(nx, ng=1)
     s = Simulation(g, k=k)
@@ -211,16 +209,16 @@ for nx in N:
 
     err.append(g.norm(g.phi - phi_analytic))
 
-    pylab.clf()
-    pylab.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], color="0.5")
-    pylab.scatter(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], color="r", marker="x")
+    # pylab.clf()
+    # pylab.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], color="0.5")
+    # pylab.scatter(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], color="r", marker="x")
 
-    pylab.xlim(g.xmin, g.xmax)
-    pylab.title("N = {}".format(nx))
-    pylab.xlabel("x")
-    pylab.ylabel(r"$\phi$")
+    # pylab.xlim(g.xmin, g.xmax)
+    # pylab.title("N = {}".format(nx))
+    # pylab.xlabel("x")
+    # pylab.ylabel(r"$\phi$")
 
-    pylab.savefig("phi-implicit-N{}.png".format(nx))
+    # pylab.savefig("phi-implicit-N{}.png".format(nx))
 
 
 pylab.clf()
@@ -240,5 +238,76 @@ pylab.ylim(1.e-6, 1.e-2)
 pylab.legend(frameon=False, fontsize="small")
 
 pylab.savefig("diffimplicit-converge-{}.png".format(C))
+
+
+#-----------------------------------------------------------------------------
+# solution at multiple times
+
+# diffusion coefficient
+k = 1.0
+
+# reference time
+t0 = 1.e-4
+
+# state coeffs
+phi1 = 1.0
+phi2 = 2.0
+
+
+nx = 128
+
+# a characteristic timescale for diffusion is 0.5*dx**2/k
+dt = 0.5/(k*nx**2)
+tmax = 100*dt
+
+# analytic on a fine grid
+nx_analytic = 512
+
+CFL = [0.8, 8.0]
+
+for alpha in CFL:
+
+    pylab.clf()
+
+    ntimes = 5
+    tend = tmax/2.0**(ntimes-1)
+
+    c = ["0.5", "r", "g", "b", "k"]
+
+    while tend <= tmax:
+
+        g = Grid1d(nx, ng=2)
+        s = Simulation(g, k=k)
+        s.init_cond("gaussian", t0, phi1, phi2)
+        s.evolve(alpha, tend)
+        
+        ga = Grid1d(nx_analytic, ng=2)
+        xc = 0.5*(ga.xmin + ga.xmax)
+        phi_analytic = phi_a(tend, k, ga.x, xc, t0, phi1, phi2)
+        
+        color = c.pop()
+        pylab.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
+                   "x", color=color, label="$t = %g$ s" % (tend))
+        pylab.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1], 
+                   color=color, ls=":")
+
+        tend = 2.0*tend
+
+
+    pylab.xlim(0.35,0.65)
+    pylab.ylim(0.95,1.7)
+
+    pylab.legend(frameon=False, fontsize="small")
+
+    pylab.xlabel("$x$")
+    pylab.ylabel(r"$\phi$")
+    pylab.title(r"implicit diffusion, N = %d, $\alpha$ = %3.2f" % (nx, alpha))
+
+    f = pylab.gcf()
+    f.set_size_inches(8.0, 6.0)
+
+
+    pylab.savefig("diff-implicit-{}-CFL_{}.png".format(nx, alpha))
+    pylab.savefig("diff-implicit-{}-CFL_{}.eps".format(nx, alpha), bbox_inches="tight")
 
 
