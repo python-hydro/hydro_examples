@@ -265,7 +265,7 @@ nx_analytic = 512
 
 CFL = [0.8, 8.0]
 
-for alpha in CFL:
+for C in CFL:
 
     pylab.clf()
 
@@ -279,7 +279,7 @@ for alpha in CFL:
         g = Grid1d(nx, ng=2)
         s = Simulation(g, k=k)
         s.init_cond("gaussian", t0, phi1, phi2)
-        s.evolve(alpha, tend)
+        s.evolve(C, tend)
         
         ga = Grid1d(nx_analytic, ng=2)
         xc = 0.5*(ga.xmin + ga.xmax)
@@ -301,13 +301,13 @@ for alpha in CFL:
 
     pylab.xlabel("$x$")
     pylab.ylabel(r"$\phi$")
-    pylab.title(r"implicit diffusion, N = %d, $\alpha$ = %3.2f" % (nx, alpha))
+    pylab.title(r"implicit diffusion, N = %d, $C$ = %3.2f" % (nx, C))
 
     f = pylab.gcf()
     f.set_size_inches(8.0, 6.0)
 
 
-    pylab.savefig("diff-implicit-{}-CFL_{}.png".format(nx, alpha))
-    pylab.savefig("diff-implicit-{}-CFL_{}.eps".format(nx, alpha), bbox_inches="tight")
+    pylab.savefig("diff-implicit-{}-CFL_{}.png".format(nx, C))
+    pylab.savefig("diff-implicit-{}-CFL_{}.eps".format(nx, C), bbox_inches="tight")
 
 
