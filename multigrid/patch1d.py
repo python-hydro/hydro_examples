@@ -136,6 +136,10 @@ class Grid1d:
         self.xr = (numpy.arange(nx+2*ng) + 1.0 - ng)*self.dx + xmin
         self.x = 0.5*(self.xl + self.xr)
 
+    def scratch_array(self):
+        return numpy.zeros((self.qx), dtype=numpy.float64)
+
+
     def __str__(self):
         """ print out some basic information about the grid object """
 
@@ -366,7 +370,7 @@ class CellCenterData1d:
         """
 
         fG = self.grid
-        fData = self.getVarPtr(varname)
+        fData = self.get_var(varname)
 
         # allocate an array for the coarsely gridded data
         ng_c = fG.ng
@@ -419,7 +423,7 @@ class CellCenterData1d:
         """
 
         cG = self.grid
-        cData = self.getVarPtr(varname)
+        cData = self.get_var(varname)
 
         # allocate an array for the coarsely gridded data
         ng_f = cG.ng
@@ -431,7 +435,7 @@ class CellCenterData1d:
         ihi_f = ng_f+nx_f-1
 
         # slopes for the coarse data
-        m_x = cG.scratchArray()
+        m_x = cG.scratch_array()
         m_x[cG.ilo:cG.ihi+1] = \
             0.5*(cData[cG.ilo+1:cG.ihi+2] - cData[cG.ilo-1:cG.ihi])
 
