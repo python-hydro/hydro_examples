@@ -20,7 +20,7 @@ https://github.com/zingale/pyro2
   – `advection.py`: a 1-d second-order linear advection solver with a
     wide range of limiters.
 
-  - `fdadvect_implicit.py`: a 1-d implicit finite-different linear advection
+  – `fdadvect_implicit.py`: a 1-d implicit finite-different linear advection
     solver.
 
 * `burgers/`
