@@ -108,45 +108,27 @@ def evolve(nx, C, u, tmax):
 u = 1.0
 tmax = 1.0/u
 
-nx = 64
+nx = 65
 CFL = [0.5, 1.0, 10.0]
 
 for C in CFL:
 
     g = evolve(nx, C, u, tmax)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], label="C = %3.2f" % (C))
+    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], label="$C = %3.1f$" % (C))
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="initial conditions")
+pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
-pylab.title("N = %d" % (nx))
-pylab.xlabel("x")
-
-pylab.legend(frameon=False, fontsize="small")
-pylab.savefig("fdadvect-implicit-64.png")
+#pylab.title("N = %d" % (nx))
+pylab.xlabel("$x$", fontsize=16)
+pylab.ylabel("$a$", fontsize=16)
 
 
-pylab.clf()
+pylab.legend(frameon=False, loc="best")
 
-nx = 256
-CFL = [0.5, 1.0, 10.0]
+pylab.tight_layout()
 
-for C in CFL:
-
-    g = evolve(nx, C, u, tmax)
-
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], label="C = %3.2f" % (C))
-
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="initial conditions")
-
-pylab.title("N = %d" % (nx))
-pylab.xlabel("x")
-
-pylab.legend(frameon=False, fontsize="small")
-pylab.savefig("fdadvect-implicit-256.png")
-
-
-
+pylab.savefig("fdadvect-implicit-65.png")
 
 
     
