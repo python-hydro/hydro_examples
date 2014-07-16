@@ -128,7 +128,7 @@ pylab.legend(frameon=False, loc="best")
 
 pylab.tight_layout()
 
-pylab.savefig("fdadvect-implicit-65.png")
+pylab.savefig("fdadvect-implicit.eps")
 
 
     
