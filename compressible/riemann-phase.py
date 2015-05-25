@@ -96,3 +96,4 @@ pylab.legend(legs, legnames, frameon=False, loc="best")
 pylab.tight_layout()
 
 pylab.savefig("riemann-phase.png")
+pylab.savefig("riemann-phase.eps")
