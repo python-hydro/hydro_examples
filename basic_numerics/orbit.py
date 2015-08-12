@@ -22,7 +22,7 @@ import numpy
 GM = 4.0*math.pi**2  #(assuming M = 1 solar mass)
 
 
-class orbitHistory:
+class OrbitHistory(object):
     """ a simple container to store the integrated history of an
         orbit """
     
@@ -33,7 +33,7 @@ class orbitHistory:
         self.u = None
         self.v = None
 
-    def finalR(self):
+    def final_R(self):
         """ the radius at the final integration time """
         N = len(self.t)
         return math.sqrt(self.x[N-1]**2 + self.y[N-1]**2)
@@ -46,7 +46,7 @@ class orbitHistory:
                           (self.y[0] - self.y[N-1])**2 )
 
 
-class orbit:
+class Orbit(object):
     """ hold the initial conditions of a planet/comet/etc. orbiting
         the Sun and integrate """
     
@@ -65,24 +65,24 @@ class orbit:
         self.v0 = 0.0
 
 
-    def keplerPeriod(self):
+    def kepler_period(self):
         """ return the period of the orbit in yr """
         return math.sqrt(self.a**3)
 
 
-    def circularVelocity(self):
+    def circular_velocity(self):
         """ return the circular velocity (in AU/yr) corresponding to
             the initial radius -- assuming a circle """
         return math.sqrt(GM/self.a)
 
 
-    def escapeVelocity(self):
+    def escape_velocity(self):
         """ return the escape velocity (in AU/yr) corresponding to
             the initial radius -- assuming a circle """
         return math.sqrt(2.0*GM/self.a)
         
 
-    def intEuler(self, dt, tmax):
+    def int_Euler(self, dt, tmax):
         """ integrate the equations of motion using Euler's method.
             We integrate until t = tmax """
 
@@ -129,8 +129,8 @@ class orbit:
             # set for the next step
             x = xnew; y = ynew; u = unew; v = vnew
 
-        # return a orbitHistory object with the trajectory
-        H = orbitHistory()
+        # return an OrbitHistory object with the trajectory
+        H = OrbitHistory()
         H.t = numpy.array(tpoints)
         H.x = numpy.array(xpoints)
         H.y = numpy.array(ypoints)
@@ -140,7 +140,7 @@ class orbit:
         return H
 
 
-    def intEulerCromer(self, dt, tmax):
+    def int_Euler_Cromer(self, dt, tmax):
         """ integrate the equations of motion using Euler's method.
             We integrate until t = tmax """
 
@@ -188,8 +188,8 @@ class orbit:
             # set for the next step
             x = xnew; y = ynew; u = unew; v = vnew
 
-        # return a orbitHistory object with the trajectory
-        H = orbitHistory()
+        # return an OrbitHistory object with the trajectory
+        H = OrbitHistory()
         H.t = numpy.array(tpoints)
         H.x = numpy.array(xpoints)
         H.y = numpy.array(ypoints)
@@ -199,7 +199,7 @@ class orbit:
         return H
 
 
-    def intRK2(self, dt, tmax):
+    def int_RK2(self, dt, tmax):
         """ integrate the equations of motion using 2nd order R-K
             method (also know as the midpoint method) We integrate
             until we reach tmax """
@@ -256,8 +256,8 @@ class orbit:
             # set for the next step
             x = xnew; y = ynew; u = unew; v = vnew
 
-        # return a orbitHistory object with the trajectory
-        H = orbitHistory()
+        # return an OrbitHistory object with the trajectory
+        H = OrbitHistory()
         H.t = numpy.array(tpoints)
         H.x = numpy.array(xpoints)
         H.y = numpy.array(ypoints)
@@ -267,7 +267,7 @@ class orbit:
         return H
 
 
-    def intRK4(self, dt, tmax):
+    def int_RK4(self, dt, tmax):
         """ integrate the equations of motion using 4th order R-K
             method.  """
 
@@ -327,8 +327,8 @@ class orbit:
             # set for the next step
             x = xnew; y = ynew; u = unew; v = vnew
 
-        # return a orbitHistory object with the trajectory
-        H = orbitHistory()
+        # return an OrbitHistory object with the trajectory
+        H = OrbitHistory()
         H.t = numpy.array(tpoints)
         H.x = numpy.array(xpoints)
         H.y = numpy.array(ypoints)
