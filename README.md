@@ -27,6 +27,12 @@ https://github.com/zingale/pyro2
   - `fdadvect.py`: a 1-d first-order explicit finite-difference linear
     advection solver using upwinded differencing.
 
+* `basic-numerics`
+
+  - `orbit-converge.py` (and `orbit.py`): a demonstration of the
+    convergence of different ODE integration methods for the problem
+	of Earth orbiting around the Sun.
+	
 * `burgers/`
 
   - `burgers.py`: a 1-d second-order solver for the inviscid Burgers’
