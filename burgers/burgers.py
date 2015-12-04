@@ -12,13 +12,15 @@ import sys
 
 class Grid1d:
 
-    def __init__(self, nx, ng, xmin=0.0, xmax=1.0):
+    def __init__(self, nx, ng, xmin=0.0, xmax=1.0, bc="outflow"):
 
         self.nx = nx
         self.ng = ng
 
         self.xmin = xmin
         self.xmax = xmax
+
+        self.bc=bc
 
         # python is zero-based.  Make easy intergers to know where the
         # real data lives
@@ -39,13 +41,26 @@ class Grid1d:
 
 
     def fill_BCs(self):
-        """ fill all ghostcells with outflow """
+        """ fill all ghostcells as periodic """
 
-        # left boundary
-        self.u[0:self.ilo] = self.u[self.ilo]
+        if self.bc == "periodic":
 
-        # right boundary
-        self.u[self.ihi+1:] = self.u[self.ihi]
+            # left boundary
+            self.u[0:self.ilo] = self.u[self.ihi-self.ng+1:self.ihi+1]
+
+            # right boundary
+            self.u[self.ihi+1:] = self.u[self.ilo:self.ilo+self.ng]
+
+        elif self.bc == "outflow":
+
+            # left boundary                                                         
+            self.u[0:self.ilo] = self.u[self.ilo]                                   
+            
+            # right boundary                                                        
+            self.u[self.ihi+1:] = self.u[self.ihi]                                  
+  
+        else:
+            sys.exit("invalid BC")
 
 
 class Simulation:
@@ -197,7 +212,7 @@ xmin = 0.0
 xmax = 1.0
 nx = 256
 ng = 2
-g = Grid1d(nx, ng)
+g = Grid1d(nx, ng, bc="periodic")
 
 # maximum evolution time based on period for unit velocity
 tmax = (xmax - xmin)/1.0
@@ -236,7 +251,7 @@ xmin = 0.0
 xmax = 1.0
 nx = 256
 ng = 2
-g = Grid1d(nx, ng)
+g = Grid1d(nx, ng, bc="outflow")
 
 # maximum evolution time based on period for unit velocity
 tmax = (xmax - xmin)/1.0
@@ -265,5 +280,5 @@ plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
 plt.xlabel("$x$")
 plt.ylabel("$u$")
 
-plt.savefig("fv-burger-tophat.png")
+plt.savefig("fv-burger-rarefaction.png")
 
