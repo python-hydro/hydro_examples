@@ -27,6 +27,12 @@ https://github.com/zingale/pyro2
   - `fdadvect.py`: a 1-d first-order explicit finite-difference linear
     advection solver using upwinded differencing.
 
+  - `Fortran/`:
+
+    * `advect.f90`: a Fortran implementation of second-order linear
+	  advection.  This version does piecewise constant, piecewise
+	  linear, and piecewise parabolic (PPM) reconstruction.
+	  
 * `basic-numerics`
 
   - `orbit-converge.py` (and `orbit.py`): a demonstration of the
@@ -103,3 +109,13 @@ https://github.com/zingale/pyro2
     VODE ODE solver (via SciPy). The two processes are coupled
     together using Strang-splitting to be second-order accurate in
     time.
+
+* `parallel/`
+
+  - `relax-mpi.f90`: a simple example of pure relaxiation using
+    domain decomposition + message passing (through MPI) to
+	implement smoothing in a parallel fashion.
+
+  - `relax-omp.f90`: a simple example of pure relaxation using
+    OpenMP to parallelize the loops using shared-memory.
+	
