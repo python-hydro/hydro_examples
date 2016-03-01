@@ -1,9 +1,9 @@
 # hydro_examples
 *Simple one-dimensional examples of various hydrodynamics techniques*
 
-This is a collection of simple python codes that demonstrate some
-basic techniques used in hydrodynamics codes.  All the codes are
-*standalone* -- there are no interdependencies.
+This is a collection of simple python codes (+ a few Fortran ones)
+that demonstrate some basic techniques used in hydrodynamics codes.
+All the codes are *standalone* -- there are no interdependencies.
 
 These codes go together with the lecture notes at:
 
