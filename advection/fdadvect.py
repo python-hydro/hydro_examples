@@ -42,30 +42,19 @@ class FDGrid(object):
         self.a[self.ihi+1] = self.a[self.ilo+1]
 
 
-# create the grid
-nx = 65
-ng = 1
-g = FDGrid(nx, ng)
-
-
-# define the CFL and speed
-Clist = [0.1, 0.5, 0.9]
-u = 1.0
-
-
-for C in Clist:
+def solve_advection(g, u, C, method="upwind", tmax_factor=1.0):
 
     # time info
     dt = C*g.dx/u
     t = 0.0
-    tmax = 1.0*(g.xmax - g.xmin)/u
+    tmax = tmax_factor*(g.xmax - g.xmin)/u
 
 
     # initialize the data -- tophat
     g.a[:] = 0.0
     g.a[np.logical_and(g.x >= 1./3., g.x <= 2./3.)] = 1.0
 
-    ainit = g.a.copy()
+    g.ainit = g.a.copy()
 
     # evolution loop
     anew = g.scratch_array()
@@ -81,29 +70,65 @@ for C in Clist:
         # But this is more general
         for i in range(g.ilo, g.ihi+1):
 
-            # FTCS
-            #anew[i] = g.a[i] - 0.5*C*(g.a[i+1] - g.a[i-1])
-
-            # upwind
-            anew[i] = g.a[i] - C*(g.a[i] - g.a[i-1])
+            if method == "upwind":
+                anew[i] = g.a[i] - C*(g.a[i] - g.a[i-1])
+            elif method == "FTCS":
+                anew[i] = g.a[i] - 0.5*C*(g.a[i+1] - g.a[i-1])
+            else:
+                sys.exit("invalid method")
 
         # store the updated solution
         g.a[:] = anew[:]
-
         t += dt
+
+
+# create the grid
+nx = 65
+ng = 1
+g = FDGrid(nx, ng)
+
+
+# define the CFL and speed
+Clist = [0.1, 0.5, 0.9]
+u = 1.0
+
+# upwind
+for C in Clist:
+    solve_advection(g, u, C)
 
     plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
              label=r"$C = {}$".format(C))
 
-
-plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", label="exact")
+plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
 plt.xlabel(r"$x$", fontsize=16)
 plt.ylabel(r"$a$", fontsize=16)
-
 
 plt.legend(frameon=False, loc="best")
 
 plt.tight_layout()
 
-plt.savefig("fdadvect.pdf")
+plt.savefig("fdadvect-upwind.pdf")
+
+
+
+plt.clf()
+
+# upwind
+for C in Clist:
+    plt.clf()
+    solve_advection(g, u, C, method="FTCS", tmax_factor=0.1)
+
+    plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
+             label=r"$C = {}$".format(C))
+
+    plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
+
+    plt.xlabel(r"$x$", fontsize=16)
+    plt.ylabel(r"$a$", fontsize=16)
+
+    plt.legend(frameon=False, loc="best")
+
+    plt.tight_layout()
+
+    plt.savefig("fdadvect-FTCS-C{}.pdf".format(C))
