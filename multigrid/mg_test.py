@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 """
 
 an example of using the multigrid class to solve Laplace's equation.  Here, we
@@ -11,28 +13,25 @@ u = 0 on the boundary [0,1]
 The analytic solution is u(x) = -sin(x) + x sin(1)
 
 """
-#from io import *
-import numpy
-import pylab
 
+import numpy as np
 import multigrid
+import matplotlib.pyplot as plt
 
-# the analytic solution
+
 def true(x):
-    return -numpy.sin(x) + x*numpy.sin(1.0)
+    # the analytic solution
+    return -np.sin(x) + x*np.sin(1.0)
 
 
-# the L2 error norm
 def error(myg, r):
-
-    # L2 norm of elements in r, multiplied by dx to
-    # normalize
-    return numpy.sqrt(myg.dx*numpy.sum((r[myg.ilo:myg.ihi+1]**2)))
+    # L2 norm of elements in r, multiplied by dx to normalize
+    return np.sqrt(myg.dx*np.sum((r[myg.ilo:myg.ihi+1]**2)))
 
 
-# the righthand side
 def f(x):
-    return numpy.sin(x)
+    # the righthand side
+    return np.sin(x)
 
                 
 # test the multigrid solver
@@ -53,7 +52,7 @@ a.init_RHS(f(a.x))
 # solve to a relative tolerance of 1.e-11
 elist, rlist = a.solve(rtol=1.e-11)
 
-Ncycle = numpy.arange(len(elist)) + 1
+Ncycle = np.arange(len(elist)) + 1
 
 
 # get the solution 
@@ -62,45 +61,42 @@ v = a.get_solution()
 # compute the error from the analytic solution
 e = v - true(a.x)
 
-print " L2 error from true solution = %g\n rel. err from previous cycle = %g\n num. cycles = %d" % \
-      (error(a.soln_grid, e), a.relative_error, a.num_cycles)
+print("L2 error from true solution = {}".format(error(a.soln_grid, e)))
+print("rel. err from previous cycle = {}".format(a.relative_error))
+print("num. cycles = {}".format(a.num_cycles))
 
 
+plt.plot(a.x[a.ilo:a.ihi+1], true(a.x[a.ilo:a.ihi+1]), color="r")
+plt.xlabel("x")
+plt.ylabel(r"$\phi$")
 
-pylab.clf()
-
-pylab.plot(a.x[a.ilo:a.ihi+1], true(a.x[a.ilo:a.ihi+1]), color="r")
-pylab.xlabel("x")
-pylab.ylabel("$\phi$")
-
-pylab.ylim([1.1*min(true(a.x[a.ilo:a.ihi+1])),0.0])
-f = pylab.gcf()
+plt.ylim([1.1*min(true(a.x[a.ilo:a.ihi+1])),0.0])
+f = plt.gcf()
 f.set_size_inches(10.0,4.5)
 
+plt.savefig("phi_analytic.png")
 
-pylab.savefig("phi_analytic.png")
 
+plt.clf()
 
-pylab.clf()
+plt.plot(Ncycle, np.array(elist), color="k", label=r"$||e||$")
+plt.plot(Ncycle, np.array(rlist), "--", color="k", label=r"$||r||$")
 
-pylab.plot(Ncycle, numpy.array(elist), color="k", label=r"$||e||$")
-pylab.plot(Ncycle, numpy.array(rlist), "--", color="k", label=r"$||r||$")
+plt.xlabel("# of V-cycles")
+plt.ylabel("L2 norm of error")
 
-pylab.xlabel("# of V-cycles")
-pylab.ylabel("L2 norm of error")
-
-ax = pylab.gca()
+ax = plt.gca()
 ax.set_yscale('log')
 
-f = pylab.gcf()
+f = plt.gcf()
 
 f.set_size_inches(8.0,6.0)
 
-pylab.legend(frameon=False)
+plt.legend(frameon=False)
 
-pylab.tight_layout()
+plt.tight_layout()
 
-pylab.savefig("mg_error_vs_cycle.png")
-pylab.savefig("mg_error_vs_cycle.eps")
+plt.savefig("mg_error_vs_cycle.png")
+plt.savefig("mg_error_vs_cycle.eps")
 
 

@@ -122,14 +122,13 @@ class CellCenterMG1d:
         # create the grids.  Here, self.grids[0] will be the coarsest
         # grid and self.grids[nlevel-1] will be the finest grid
         # we store the solution, v, the rhs, f.
-        i = 0
-        nx_t = 2
 
-        if (self.verbose):
+        if self.verbose:
             print("alpha = ", self.alpha)
             print("beta  = ", self.beta)
 
-        while i < self.nlevels:
+        nx_t = 2
+        for i in range(self.nlevels):
             
             # create the grid
             my_grid = patch1d.Grid1d(nx_t, ng=self.ng,
@@ -151,9 +150,6 @@ class CellCenterMG1d:
                 print(self.grids[i])
 
             nx_t = nx_t*2
-
-            i += 1
-
 
         # provide coordinate and indexing information for the solution mesh
         soln_grid = self.grids[self.nlevels-1].grid
@@ -251,9 +247,7 @@ class CellCenterMG1d:
         self.grids[level].fill_BC("v")
 
         # do red-black G-S
-        i = 0
-        while i < nsmooth:
-
+        for i in range(nsmooth):
             xcoeff = self.beta/myg.dx**2
 
             # do the red black updating in four decoupled groups
@@ -270,9 +264,6 @@ class CellCenterMG1d:
                  (self.alpha + 2.0*xcoeff)
 
             self.grids[level].fill_BC("v")
-                                                     
-            i += 1
-
 
 
     def solve(self, rtol = 1.e-11):
@@ -301,14 +292,12 @@ class CellCenterMG1d:
         while not converged and cycle <= self.max_cycles:
 
             # zero out the solution on all but the finest grid
-            level = 0
-            while level < self.nlevels-1:
+            for level in range(self.nlevels-1):
                 v = self.grids[level].zero("v")
-                level += 1            
 
             # descending part
             if self.verbose:
-                print("<<< beginning V-cycle (cycle %d) >>>\n" % cycle)
+                print("<<< beginning V-cycle (cycle {}) >>>\n".format(cycle))
 
             level = self.nlevels-1
             while level > 0:
@@ -322,10 +311,8 @@ class CellCenterMG1d:
                 if self.verbose:
                     self._compute_residual(level)
 
-                    print("  level = %d, nx = %d" % (level, fP.grid.nx))
-
-                    print("  before G-S, residual L2 norm = %g" % \
-                          (_error(fP.grid, r) ))
+                    print("  level = {}, nx = {}".format(level, fP.grid.nx))
+                    print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
             
                 # smooth on the current level
                 self.smooth(level, self.nsmooth)
@@ -335,8 +322,7 @@ class CellCenterMG1d:
                 self._compute_residual(level)
 
                 if self.verbose:
-                    print("  after G-S, residual L2 norm = %g\n" % \
-                          (_error(fP.grid, r) ))
+                    print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
 
 
                 # restrict the residual down to the RHS of the coarser level
@@ -356,7 +342,7 @@ class CellCenterMG1d:
             bP = self.grids[0]
 
             if self.verbose:
-                print("  level = %d, nx = %d\n" %  (level, bP.grid.nx))
+                print("  level = {}, nx = {}\n".format(level, bP.grid.nx))
 
             self.smooth(0, self.nsmooth_bottom)
 
@@ -364,8 +350,7 @@ class CellCenterMG1d:
 
             
             # ascending part
-            level = 1
-            while level < self.nlevels:
+            for level in range(1, self.nlevels):
 
                 fP = self.grids[level]
                 cP = self.grids[level-1]
@@ -381,10 +366,9 @@ class CellCenterMG1d:
                     self._compute_residual(level)
                     r = fP.get_var("r")
 
-                    print("  level = %d, nx = %d" % (level, fP.grid.nx))
+                    print("  level = {}, nx = {}".format(level, fP.grid.nx))
 
-                    print("  before G-S, residual L2 norm = %g" % \
-                          (_error(fP.grid, r) ))
+                    print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
             
                 # smooth
                 self.smooth(level, self.nsmooth)
@@ -392,10 +376,8 @@ class CellCenterMG1d:
                 if self.verbose:
                     self._compute_residual(level)
 
-                    print("  after G-S, residual L2 norm = %g\n" % \
-                          (_error(fP.grid, r) ))
+                    print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
             
-                level += 1
 
             # compute the error with respect to the previous solution
             # this is for diagnostic purposes only -- it is not used to
@@ -418,7 +400,6 @@ class CellCenterMG1d:
             else:
                 residual_error = _error(fP.grid, r)
 
-                
             if residual_error < rtol:
                 converged = 1
                 self.num_cycles = cycle
@@ -427,9 +408,8 @@ class CellCenterMG1d:
                 fP.fill_BC("v")
                 
             if self.verbose:
-                print("cycle %d: relative err = %g, residual err = %g\n" % \
-                      (cycle, relative_error, residual_error))
-
+                print("cycle {}: relative err = {}, residual err = {}\n".format(
+                    cycle, relative_error, residual_error))
 
             rlist.append(residual_error)
             

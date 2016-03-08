@@ -143,7 +143,7 @@ class Grid1d:
     def __str__(self):
         """ print out some basic information about the grid object """
 
-        return "1-d grid: nx = " + `self.nx` + ", ng = " + `self.ng`
+        return "1-d grid: nx = {}, ng = {}".format(self.nx, self.ng)
 
 
 class CellCenterData1d:
@@ -227,16 +227,14 @@ class CellCenterData1d:
             myStr = "CellCenterData1d object not yet initialized"
             return myStr
 
-        myStr = "cc data: nx = " + `self.grid.nx` + \
-                       ", ng = " + `self.grid.ng` + "\n" + \
-                 "   nvars = " + `self.nvar` + "\n" + \
-                 "   variables: \n" 
+        myStr = "cc data: nx = {}, ng = {}\n".format(self.grid.nx, self.grid.ng) + \
+                "         nvars = {}\n".format(self.nvar) + \
+                "variables: \n" 
                  
         ilo = self.grid.ilo
         ihi = self.grid.ihi
 
-        n = 0
-        while n < self.nvar:
+        for n in range(self.nvar):
             myStr += "%16s: min: %15.10f    max: %15.10f\n" % \
                 (self.vars[n],
                  numpy.min(self.data[n,ilo:ihi+1]), 
@@ -244,7 +242,6 @@ class CellCenterData1d:
             myStr += "%16s  BCs: -x: %-12s +x: %-12s \n" %\
                 (" " , self.BCs[self.vars[n]].xlb, 
                        self.BCs[self.vars[n]].xrb)
-            n += 1
  
         return myStr
     
@@ -296,70 +293,41 @@ class CellCenterData1d:
 
         # -x boundary
         if self.BCs[name].xlb == "outflow" or self.BCs[name].xlb == "neumann":
-
-            i = 0
-            while i < self.grid.ilo:
+            for i in range(0, self.grid.ilo):
                 self.data[n,i] = self.data[n,self.grid.ilo]
-                i += 1                
 
         elif self.BCs[name].xlb == "reflect-even":
-        
-            i = 0
-            while i < self.grid.ilo:
+            for i in range(0, self.grid.ilo):
                 self.data[n,i] = self.data[n,2*self.grid.ng-i-1]
-                i += 1
 
-        elif (self.BCs[name].xlb == "reflect-odd" or 
-              self.BCs[name].xlb == "dirichlet"):
-        
-            i = 0
-            while i < self.grid.ilo:
+        elif self.BCs[name].xlb in ["reflect-odd", "dirichlet"]:
+            for i in range(0, self.grid.ilo):
                 self.data[n,i] = -self.data[n,2*self.grid.ng-i-1]
-                i += 1
 
         elif self.BCs[name].xlb == "periodic":
-
-            i = 0
-            while i < self.grid.ilo:
+            for i in range(0, self.grid.ilo):
                 self.data[n,i] = self.data[n,self.grid.ihi-self.grid.ng+i+1]
-                i += 1
-            
 
         # +x boundary
         if self.BCs[name].xrb == "outflow" or self.BCs[name].xrb == "neumann":
-
-            i = self.grid.ihi+1
-            while i < self.grid.nx+2*self.grid.ng:
+            for i in range(self.grid.ihi+1, self.grid.nx+2*self.grid.ng):
                 self.data[n,i] = self.data[n,self.grid.ihi]
-                i += 1
-                
+
         elif self.BCs[name].xrb == "reflect-even":
-
-            i = 0
-            while i < self.grid.ng:
+            for i in range(0, self.grid.ng):
                 i_bnd = self.grid.ihi+1+i
                 i_src = self.grid.ihi-i
-
                 self.data[n,i_bnd] = self.data[n,i_src]
-                i += 1
 
-        elif (self.BCs[name].xrb == "reflect-odd" or
-              self.BCs[name].xrb == "dirichlet"):
-
-            i = 0
-            while i < self.grid.ng:
+        elif self.BCs[name].xrb in ["reflect-odd", "dirichlet"]:
+            for i in range(0, self.grid.ng):
                 i_bnd = self.grid.ihi+1+i
                 i_src = self.grid.ihi-i
-                
                 self.data[n,i_bnd] = -self.data[n,i_src]
-                i += 1
 
         elif self.BCs[name].xrb == "periodic":
-
-            i = self.grid.ihi+1
-            while i < 2*self.grid.ng + self.grid.nx:
+            for i in range(self.grid.ihi+1, 2*self.grid.ng + self.grid.nx):
                 self.data[n,i] = self.data[n,i-self.grid.ihi-1+self.grid.ng]
-                i += 1
 
 
     def restrict(self, varname):

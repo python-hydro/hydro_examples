@@ -12,37 +12,31 @@ The analytic solution is u(x) = -sin(x) + x sin(1)
 we run at a variety of resolutions and compare to the analytic solution.
 
 """
-
-import numpy
-import pylab
-
+#from io import *
+import numpy as np
 import multigrid
+import matplotlib.pyplot as plt
 
 
-# the analytic solution
 def true(x):
-    return -numpy.sin(x) + x*numpy.sin(1.0)
+    # the analytic solution
+    return -np.sin(x) + x*np.sin(1.0)
 
 
-# the L2 error norm
 def error(myg, r):
-
-    # L2 norm of elements in r, multiplied by dx to
-    # normalize
-    return numpy.sqrt(myg.dx*numpy.sum((r[myg.ilo:myg.ihi+1]**2)))
+    # L2 norm of elements in r, multiplied by dx to normalize
+    return np.sqrt(myg.dx*np.sum((r[myg.ilo:myg.ihi+1]**2)))
 
 
-# the righthand side
 def f(x):
-    return numpy.sin(x)
-
+    # the righthand side
+    return np.sin(x)
 
 
 def mgsolve(nx):
-                
+
     # create the multigrid object
-    a = multigrid.CellCenterMG1d(nx, 
-                                 xl_BC_type="dirichlet", xr_BC_type="dirichlet",
+    a = multigrid.CellCenterMG1d(nx, xl_BC_type="dirichlet", xr_BC_type="dirichlet",
                                  verbose=0)
 
     # initialize the solution to 0
@@ -54,7 +48,7 @@ def mgsolve(nx):
     # solve to a relative tolerance of 1.e-11
     a.solve(rtol=1.e-11)
 
-    # get the solution 
+    # get the solution
     v = a.get_solution()
 
     # compute the error from the analytic solution
@@ -67,32 +61,23 @@ err = []
 for nx in N:
     err.append(mgsolve(nx))
 
-N = numpy.array(N, dtype=numpy.float64)
-err = numpy.array(err)
+N = np.array(N, dtype=np.float64)
+err = np.array(err)
 
-pylab.scatter(N, err, color="r")
-pylab.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
+plt.scatter(N, err, color="r")
+plt.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label=r"$\mathcal{O}(\Delta x^2)$")
 
-print N
-print err[0]*(N[0]/N)**2
+print(N, err[0]*(N[0]/N)**2)
 
-ax = pylab.gca()
+ax = plt.gca()
 ax.set_xscale('log')
 ax.set_yscale('log')
 
-pylab.ylim(1.e-8, 1.e-3)
+plt.ylim(1.e-8, 1.e-3)
 
-pylab.xlabel("N")
-pylab.ylabel("L2 norm of absolute error")
-pylab.title("Multigrid convergence")
+plt.xlabel("N")
+plt.ylabel("L2 norm of absolute error")
 
-pylab.legend(frameon=False)
+plt.legend(frameon=False)
 
-pylab.tight_layout()
-
-pylab.savefig("mg-converge.png")
-pylab.savefig("mg-converge.eps")
-
-
-
-
+plt.savefig("mg-converge.png")
