@@ -421,7 +421,7 @@ class CellCenterMG1d:
                 
             if residual_error < rtol:
                 converged = 1
-                self.numCycles = cycle
+                self.num_cycles = cycle
                 self.relative_error = relative_error
                 self.residual_error = residual_error
                 fP.fill_BC("v")
@@ -437,6 +437,7 @@ class CellCenterMG1d:
                 elist.append(_error(fP.grid, (old_solution - self.true_function(fP.grid.x))))
 
             cycle += 1
+        
 
         return elist, rlist
 
