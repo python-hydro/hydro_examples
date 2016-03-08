@@ -95,11 +95,9 @@ def doit(Nx, Ny, do_plot=False):
 
         plt.colorbar()
 
-
         plt.tight_layout()
 
-        plt.savefig("poisson_fft.png")
-        plt.savefig("poisson_fft.eps")
+        plt.savefig("poisson_fft.pdf")
         
 
     # return the error, compared to the true solution
@@ -141,8 +139,7 @@ plt.ylabel("L2 norm of abs error")
 f = plt.gcf()
 f.set_size_inches(5.0,5.0)
 
-plt.savefig("fft-poisson-converge.png", bbox_inches="tight")
-plt.savefig("fft-poisson-converge.eps", bbox_inches="tight")
+plt.savefig("fft-poisson-converge.pdf", bbox_inches="tight")
 
                                     
 
