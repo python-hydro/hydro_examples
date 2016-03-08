@@ -233,7 +233,7 @@ for i in range(0,10):
 
     c = 1.0 - (0.1 + i*0.1)
     g = s.grid
-    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=`c`)
+    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
 
 
 g = s.grid
@@ -272,7 +272,7 @@ for i in range(0,10):
     s.evolve(C, tend)
 
     c = 1.0 - (0.1 + i*0.1)
-    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=`c`)
+    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
 
 
 plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
