@@ -8,12 +8,12 @@
 #
 # M. Zingale (2013-04-07)
 
-import numpy
-import pylab
-import sys
+from __future__ import print_function
 
+import numpy as np
+import matplotlib.pyplot as plt
 
-class Grid1d:
+class Grid1d(object):
 
     def __init__(self, nx, ng=1, xmin=0.0, xmax=1.0):
         """ grid class initialization """
@@ -24,60 +24,50 @@ class Grid1d:
         self.xmin = xmin
         self.xmax = xmax
 
-        self.dx = (xmax - xmin)/nx
-        self.x = (numpy.arange(nx+2*ng) + 0.5 - ng)*self.dx + xmin
-
         self.ilo = ng
         self.ihi = ng+nx-1
 
+        self.dx = (xmax - xmin)/nx
+        self.x = xmin + (np.arange(nx+2*ng) -ng + 0.5)*self.dx
+
         # storage for the solution
-        self.phi = numpy.zeros((nx+2*ng), dtype=numpy.float64)
+        self.phi = np.zeros((nx+2*ng), dtype=np.float64)
 
-    def fillBC(self):
+    def scratch_array(self):
+        return np.zeros((2*self.ng+self.nx), dtype=np.float64)
+
+    def fill_BCs(self):
         """ fill the Neumann BCs """
-
-        # Neumann BCs
         self.phi[0:self.ilo]  = self.phi[self.ilo]
         self.phi[self.ihi+1:] = self.phi[self.ihi]
 
-
-    def scratch_array(self):
-        return numpy.zeros((2*self.ng+self.nx), dtype=numpy.float64)
-
+    def phi_a(self, t, k, t0, phi1, phi2):
+        """ analytic solution for the diffusion of a Gaussian """
+        xc = 0.5*(self.xmin + self.xmax)
+        return (phi2 - phi1)*np.sqrt(t0/(t + t0)) * \
+            np.exp(-0.25*(self.x-xc)**2/(k*(t + t0))) + phi1
 
     def norm(self, e):
         """ return the norm of quantity e which lives on the grid """
         if not len(e) == (2*self.ng + self.nx):
             return None
 
-        return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
+        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
 
 
-
-def phi_a(t, k, x, xc, t0, phi1, phi2):
-    """ analytic solution for the diffusion of a Gaussian """
-
-    return (phi2 - phi1)*numpy.sqrt(t0/(t + t0)) * \
-        numpy.exp(-0.25*(x-xc)**2/(k*(t + t0))) + phi1
-
-
-class Simulation:
+class Simulation(object):
 
     def __init__(self, grid, k=1.0):
         self.grid = grid
         self.t = 0.0
         self.k = k  # diffusion coefficient
 
-
     def init_cond(self, name, *args):
+        # initialize the data
 
         if name == "gaussian":
-
-            # initialize the data
-            xc = 0.5*(self.grid.xmin + self.grid.xmax)
             t0, phi1, phi2 = args
-            self.grid.phi[:] = phi_a(0.0, self.k, self.grid.x, xc, t0, phi1, phi2)
-
+            self.grid.phi[:] = self.grid.phi_a(0.0, self.k, t0, phi1, phi2)
 
     def evolve(self, C, tmax):
 
@@ -85,7 +75,6 @@ class Simulation:
 
         # time info
         dt = C*0.5*gr.dx**2/self.k
-
 
         phinew = gr.scratch_array()
     
@@ -96,25 +85,20 @@ class Simulation:
                 dt = tmax - self.t
 
             # fill the boundary conditions
-            gr.fillBC()
+            gr.fill_BCs()
 
             alpha = self.k*dt/gr.dx**2
 
             # loop over zones
-            i = g.ilo
-            while (i <= g.ihi):
+            for i in range(g.ilo, g.ihi+1):
         
                 # explicit diffusion
                 phinew[i] = gr.phi[i] + \
                             alpha*(gr.phi[i+1] - 2.0*gr.phi[i] + gr.phi[i-1])
-                
-                i += 1
 
             # store the updated solution
             gr.phi[:] = phinew[:]
-
             self.t += dt
-
 
 
 #-----------------------------------------------------------------------------
@@ -134,7 +118,7 @@ phi2 = 2.0
 # a characteristic timescale for diffusion if L^2/k
 tmax = 0.0008
 
-nx = 128
+nx = 64
 
 C = 0.8
 
@@ -150,30 +134,31 @@ while tend <= tmax:
     s.init_cond("gaussian", t0, phi1, phi2)
     s.evolve(C, tend)
 
-    xc = 0.5*(g.xmin + g.xmax)
-    phi_analytic = phi_a(tend, k, g.x, xc, t0, phi1, phi2)
+    phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
     
     color = c.pop()
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
+    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
                "x", color=color, label="$t = %g$ s" % (tend))
-    pylab.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
+    plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
                color=color, ls=":")
 
     tend = 10.0*tend
 
 
-pylab.xlim(0.35,0.65)
+plt.xlim(0.35,0.65)
 
-pylab.legend(frameon=False, fontsize="small")
+plt.legend(frameon=False, fontsize="medium")
 
-pylab.xlabel("$x$")
-pylab.ylabel(r"$\phi$")
-pylab.title("explicit diffusion, nx = %d, C = %3.2f" % (nx, C))
+plt.xlabel("$x$", fontsize="large")
+plt.ylabel(r"$\phi$", fontsize="large")
+plt.title("explicit diffusion, nx = {}, C = {:3.2f}".format(nx, C))
 
-pylab.savefig("diff-explicit-{}.png".format(nx))
+plt.savefig("diff-explicit-{}.pdf".format(nx))
 
 #-----------------------------------------------------------------------------
 # convergence
+
+plt.clf()
 
 # a characteristic timescale for diffusion is L^2/k
 tmax = 0.005
@@ -184,8 +169,7 @@ phi2 = 2.0
 
 k = 1.0
 
-N = [32, 64, 128, 256, 512]
-
+N = [16, 32, 64, 128, 256, 512]
 
 # CFL number
 C = 0.8
@@ -194,46 +178,51 @@ err = []
 
 for nx in N:
 
-    print nx
-
     # the present C-N discretization
     g = Grid1d(nx, ng=1)
     s = Simulation(g, k=k)
     s.init_cond("gaussian", t0, phi1, phi2)
     s.evolve(C, tmax)
     
-    xc = 0.5*(g.xmin + g.xmax)
-    phi_analytic = phi_a(tmax, k, g.x, xc, t0, phi1, phi2)
+    phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
 
     err.append(g.norm(g.phi - phi_analytic))
 
+    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], label="N = %d" % (nx))
 
-pylab.clf()
+plt.legend(frameon=False)
+plt.xlabel("$x$", fontsize="large")
+plt.ylabel(r"$\phi$", fontsize="large")
+plt.title("Explicit diffusion with varying resolution, C = {:3.2f}, t = {:5.2g}".format(C, tmax))
 
-N = numpy.array(N, dtype=numpy.float64)
-err = numpy.array(err)
+plt.savefig("diffexplicit-res.pdf")
 
-pylab.scatter(N, err, color="r", label="explicit diffusion")
-pylab.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
+plt.clf()
+
+N = np.array(N, dtype=np.float64)
+err = np.array(err)
+
+plt.scatter(N, err, color="r", label="explicit diffusion")
+plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
 
 
-pylab.xlabel(r"$N$")
-pylab.ylabel(r"L2 norm of absolute error")
-pylab.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
+plt.xlabel(r"$N$", fontsize="large")
+plt.ylabel(r"L2 norm of absolute error")
+plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
 
-pylab.ylim(1.e-6, 1.e-2)
-pylab.legend(frameon=False, fontsize="small")
+plt.ylim(1.e-6, 1.e-2)
+plt.legend(frameon=False)
 
-pylab.savefig("diffexplicit-converge-{}.png".format(C))
+plt.savefig("diffexplicit-converge-{}.pdf".format(C))
 
 
 
 #-----------------------------------------------------------------------------
 # exceed the timestep limit
 
-pylab.clf()
+plt.clf()
 
-# a characteristic timescale for diffusion if L^2/k
+# a characteristic timescale for diffusion is L^2/k
 tmax = 0.005
 
 nx = 64
@@ -245,20 +234,23 @@ s = Simulation(g, k=k)
 s.init_cond("gaussian", t0, phi1, phi2)
 s.evolve(C, tend)
 
-xc = 0.5*(g.xmin + g.xmax)
-phi_analytic = phi_a(tend, k, g.x, xc, t0, phi1, phi2)
+phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
     
-pylab.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
+plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
            "x-", color="r", label="$t = %g$ s" % (tend))
-pylab.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
+plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
            color="0.5", ls=":")
 
-pylab.xlim(0.35,0.65)
-pylab.xlabel("$x$")
-pylab.ylabel(r"$\phi$")
-pylab.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
+plt.xlim(0.35,0.65)
+plt.xlabel("$x$", fontsize="large")
+plt.ylabel(r"$\phi$", fontsize="large")
+plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
 
-pylab.savefig("diff-explicit-64-bad.png")
+ax = plt.gca()
+ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
+ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
+ 
+plt.savefig("diff-explicit-64-bad.pdf")
 
 
 
