@@ -210,7 +210,7 @@ plt.xlabel(r"$N$", fontsize="large")
 plt.ylabel(r"L2 norm of absolute error")
 plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
 
-plt.ylim(1.e-6, 1.e-2)
+plt.ylim(1.e-6, 1.e-1)
 plt.legend(frameon=False)
 
 plt.savefig("diffexplicit-converge-{}.pdf".format(C))
@@ -251,11 +251,3 @@ ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
 ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
  
 plt.savefig("diff-explicit-64-bad.pdf")
-
-
-
-
-
-
-
-    
