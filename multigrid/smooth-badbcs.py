@@ -133,13 +133,15 @@ c = ["r", "r:", "g", "g:", "b", "b:"]
 
 for nx in N:
 
+    color = c.pop()
+
     if len(c) % 2 == 0: 
         n, r, e = smoothRun(nx)
+        plt.plot(n, e, color, label="{}".format(nx))
     else:
         n, r, e = smoothRun(nx, badBCs=1)
+        plt.plot(n, e, color)
 
-    color = c.pop()
-    plt.plot(n, e, color)
 
 ax = plt.gca()
 ax.set_xscale('log')
