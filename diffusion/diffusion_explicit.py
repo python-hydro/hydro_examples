@@ -101,33 +101,131 @@ class Simulation(object):
             self.t += dt
 
 
-#-----------------------------------------------------------------------------
-# diffusion coefficient
-k = 1.0
+if __name__ == "__main__":
 
-# reference time
-t0 = 1.e-4
+    #-----------------------------------------------------------------------------
+    # diffusion coefficient
+    k = 1.0
 
-# state coeffs
-phi1 = 1.0
-phi2 = 2.0
+    # reference time
+    t0 = 1.e-4
+
+    # state coeffs
+    phi1 = 1.0
+    phi2 = 2.0
+
+    # solution at multiple times
+
+    # a characteristic timescale for diffusion if L^2/k
+    tmax = 0.0008
+
+    nx = 64
+
+    C = 0.8
+
+    ntimes = 4
+    tend = tmax/10.0**ntimes
+
+    c = ["0.5", "r", "g", "b", "k"]
+
+    while tend <= tmax:
+
+        g = Grid1d(nx, ng=2)
+        s = Simulation(g, k=k)
+        s.init_cond("gaussian", t0, phi1, phi2)
+        s.evolve(C, tend)
+
+        phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
+
+        color = c.pop()
+        plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
+                 "x", color=color, label="$t = %g$ s" % (tend))
+        plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
+                 color=color, ls=":")
+
+        tend = 10.0*tend
+
+    plt.xlim(0.35,0.65)
+
+    plt.legend(frameon=False, fontsize="medium")
+
+    plt.xlabel("$x$", fontsize="large")
+    plt.ylabel(r"$\phi$", fontsize="large")
+    plt.title("explicit diffusion, nx = {}, C = {:3.2f}".format(nx, C))
+
+    plt.savefig("diff-explicit-{}.pdf".format(nx))
+
+    #-----------------------------------------------------------------------------
+    # convergence
+
+    plt.clf()
+
+    # a characteristic timescale for diffusion is L^2/k
+    tmax = 0.005
+
+    t0 = 1.e-4
+    phi1 = 1.0
+    phi2 = 2.0
+
+    k = 1.0
+
+    N = [16, 32, 64, 128, 256, 512]
+
+    # CFL number
+    C = 0.8
+
+    err = []
+
+    for nx in N:
+
+        # the present C-N discretization
+        g = Grid1d(nx, ng=1)
+        s = Simulation(g, k=k)
+        s.init_cond("gaussian", t0, phi1, phi2)
+        s.evolve(C, tmax)
+
+        phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
+
+        err.append(g.norm(g.phi - phi_analytic))
+
+        plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], label="N = %d" % (nx))
+
+    plt.legend(frameon=False)
+    plt.xlabel("$x$", fontsize="large")
+    plt.ylabel(r"$\phi$", fontsize="large")
+    plt.title("Explicit diffusion with varying resolution, C = {:3.2f}, t = {:5.2g}".format(C, tmax))
+
+    plt.savefig("diffexplicit-res.pdf")
+
+    plt.clf()
+
+    N = np.array(N, dtype=np.float64)
+    err = np.array(err)
+
+    plt.scatter(N, err, color="r", label="explicit diffusion")
+    plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
+
+    plt.xlabel(r"$N$", fontsize="large")
+    plt.ylabel(r"L2 norm of absolute error")
+    plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
+
+    plt.ylim(1.e-6, 1.e-1)
+    plt.legend(frameon=False)
+
+    plt.savefig("diffexplicit-converge-{}.pdf".format(C))
 
 
-# solution at multiple times
+    #-----------------------------------------------------------------------------
+    # exceed the timestep limit
 
-# a characteristic timescale for diffusion if L^2/k
-tmax = 0.0008
+    plt.clf()
 
-nx = 64
+    # a characteristic timescale for diffusion is L^2/k
+    tmax = 0.005
 
-C = 0.8
+    nx = 64
 
-ntimes = 4
-tend = tmax/10.0**ntimes
-
-c = ["0.5", "r", "g", "b", "k"]
-
-while tend <= tmax:
+    C = 2.0
 
     g = Grid1d(nx, ng=2)
     s = Simulation(g, k=k)
@@ -136,118 +234,18 @@ while tend <= tmax:
 
     phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
 
-    color = c.pop()
     plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
-               "x", color=color, label="$t = %g$ s" % (tend))
+             "x-", color="r", label="$t = %g$ s" % (tend))
     plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
-               color=color, ls=":")
+             color="0.5", ls=":")
 
-    tend = 10.0*tend
+    plt.xlim(0.35,0.65)
+    plt.xlabel("$x$", fontsize="large")
+    plt.ylabel(r"$\phi$", fontsize="large")
+    plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
 
+    ax = plt.gca()
+    ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
+    ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
 
-plt.xlim(0.35,0.65)
-
-plt.legend(frameon=False, fontsize="medium")
-
-plt.xlabel("$x$", fontsize="large")
-plt.ylabel(r"$\phi$", fontsize="large")
-plt.title("explicit diffusion, nx = {}, C = {:3.2f}".format(nx, C))
-
-plt.savefig("diff-explicit-{}.pdf".format(nx))
-
-#-----------------------------------------------------------------------------
-# convergence
-
-plt.clf()
-
-# a characteristic timescale for diffusion is L^2/k
-tmax = 0.005
-
-t0 = 1.e-4
-phi1 = 1.0
-phi2 = 2.0
-
-k = 1.0
-
-N = [16, 32, 64, 128, 256, 512]
-
-# CFL number
-C = 0.8
-
-err = []
-
-for nx in N:
-
-    # the present C-N discretization
-    g = Grid1d(nx, ng=1)
-    s = Simulation(g, k=k)
-    s.init_cond("gaussian", t0, phi1, phi2)
-    s.evolve(C, tmax)
-
-    phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
-
-    err.append(g.norm(g.phi - phi_analytic))
-
-    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], label="N = %d" % (nx))
-
-plt.legend(frameon=False)
-plt.xlabel("$x$", fontsize="large")
-plt.ylabel(r"$\phi$", fontsize="large")
-plt.title("Explicit diffusion with varying resolution, C = {:3.2f}, t = {:5.2g}".format(C, tmax))
-
-plt.savefig("diffexplicit-res.pdf")
-
-plt.clf()
-
-N = np.array(N, dtype=np.float64)
-err = np.array(err)
-
-plt.scatter(N, err, color="r", label="explicit diffusion")
-plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
-
-
-plt.xlabel(r"$N$", fontsize="large")
-plt.ylabel(r"L2 norm of absolute error")
-plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
-
-plt.ylim(1.e-6, 1.e-1)
-plt.legend(frameon=False)
-
-plt.savefig("diffexplicit-converge-{}.pdf".format(C))
-
-
-
-#-----------------------------------------------------------------------------
-# exceed the timestep limit
-
-plt.clf()
-
-# a characteristic timescale for diffusion is L^2/k
-tmax = 0.005
-
-nx = 64
-
-C = 2.0
-
-g = Grid1d(nx, ng=2)
-s = Simulation(g, k=k)
-s.init_cond("gaussian", t0, phi1, phi2)
-s.evolve(C, tend)
-
-phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
-
-plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
-           "x-", color="r", label="$t = %g$ s" % (tend))
-plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
-           color="0.5", ls=":")
-
-plt.xlim(0.35,0.65)
-plt.xlabel("$x$", fontsize="large")
-plt.ylabel(r"$\phi$", fontsize="large")
-plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
-
-ax = plt.gca()
-ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-
-plt.savefig("diff-explicit-64-bad.pdf")
+    plt.savefig("diff-explicit-64-bad.pdf")
