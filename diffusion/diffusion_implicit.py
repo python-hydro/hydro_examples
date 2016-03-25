@@ -180,6 +180,8 @@ if __name__ == "__main__":
     plt.ylim(1.e-6, 1.e-2)
     plt.legend(frameon=False, fontsize="small")
 
+    plt.tight_layout()
+
     plt.savefig("diffimplicit-converge-{}.pdf".format(C))
 
 
@@ -248,4 +250,39 @@ if __name__ == "__main__":
         f = plt.gcf()
         f.set_size_inches(8.0, 6.0)
 
+        plt.tight_layout()
         plt.savefig("diff-implicit-{}-CFL_{}.pdf".format(nx, C))
+
+
+    # under-resolved example
+    plt.clf()
+    nx = 64
+    C = 10.0
+    tmax = 0.001
+
+    g = Grid1d(nx, ng=2)
+    s = Simulation(g, k=k)
+    s.init_cond("gaussian", t0, phi1, phi2)
+    s.evolve(C, tend)
+
+    ga = Grid1d(nx_analytic, ng=2)
+    xc = 0.5*(ga.xmin + ga.xmax)
+    phi_analytic = ga.phi_a(tend, k, t0, phi1, phi2)
+
+    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
+             color="r", marker="x", ls="-", label="$t = %g$ s" % (tend))
+    plt.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1],
+             color=color, ls=":")
+
+    plt.xlim(0.2,0.8)
+
+    plt.xlabel("$x$", fontsize="large")
+    plt.ylabel(r"$\phi$", fontsize="large")
+    plt.title(r"implicit diffusion, N = {}, $C$ = {:3.2f}, $t$ = {}".format(nx, C, tmax))
+
+    f = plt.gcf()
+    f.set_size_inches(8.0, 6.0)
+
+    plt.tight_layout()
+
+    plt.savefig("diff-implicit-{}-CFL_{}.pdf".format(nx, C))

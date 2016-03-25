@@ -76,6 +76,7 @@ if __name__ == "__main__":
         plt.ylim(1.e-6, 1.e-1)
         plt.legend(frameon=False, loc="best", fontsize="small")
 
+        plt.tight_layout()
         plt.savefig("diffimplicit-converge-{}.pdf".format(C))
 
 
