@@ -90,7 +90,7 @@ class Simulation(object):
             alpha = self.k*dt/gr.dx**2
 
             # loop over zones
-            for i in range(g.ilo, g.ihi+1):
+            for i in range(gr.ilo, gr.ihi+1):
 
                 # explicit diffusion
                 phinew[i] = gr.phi[i] + \
