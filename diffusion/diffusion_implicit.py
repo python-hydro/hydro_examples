@@ -118,132 +118,134 @@ class Simulation(object):
             self.t += dt
 
 
-#-----------------------------------------------------------------------------
-# Convergence of a Gaussian
+if __name__ == "__main__":
 
-# a characteristic timescale for diffusion is L^2/k
-tmax = 0.005
+    #--------------------------------------------------------------------------
+    # Convergence of a Gaussian
 
-t0 = 1.e-4
-phi1 = 1.0
-phi2 = 2.0
+    # a characteristic timescale for diffusion is L^2/k
+    tmax = 0.005
 
-k = 1.0
+    t0 = 1.e-4
+    phi1 = 1.0
+    phi2 = 2.0
 
-N = [32, 64, 128, 256, 512]
+    k = 1.0
 
-# CFL number
-C = 0.8
+    N = [32, 64, 128, 256, 512]
 
-err = []
+    # CFL number
+    C = 0.8
 
-for nx in N:
+    err = []
 
-    # the present C-N discretization
-    g = Grid1d(nx, ng=1)
-    s = Simulation(g, k=k)
-    s.init_cond("gaussian", t0, phi1, phi2)
-    s.evolve(C, tmax)
+    for nx in N:
 
-    xc = 0.5*(g.xmin + g.xmax)
-    phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
+        # the present C-N discretization
+        g = Grid1d(nx, ng=1)
+        s = Simulation(g, k=k)
+        s.init_cond("gaussian", t0, phi1, phi2)
+        s.evolve(C, tmax)
+        
+        xc = 0.5*(g.xmin + g.xmax)
+        phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
 
-    err.append(g.norm(g.phi - phi_analytic))
+        err.append(g.norm(g.phi - phi_analytic))
 
-    # plt.clf()
-    # plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], color="0.5")
-    # plt.scatter(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], color="r", marker="x")
+        # plt.clf()
+        # plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], color="0.5")
+        # plt.scatter(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], color="r", marker="x")
 
-    # plt.xlim(g.xmin, g.xmax)
-    # plt.title("N = {}".format(nx))
-    # plt.xlabel("x")
-    # plt.ylabel(r"$\phi$")
+        # plt.xlim(g.xmin, g.xmax)
+        # plt.title("N = {}".format(nx))
+        # plt.xlabel("x")
+        # plt.ylabel(r"$\phi$")
 
-    # plt.savefig("phi-implicit-N{}.png".format(nx))
+        # plt.savefig("phi-implicit-N{}.png".format(nx))
 
-
-plt.clf()
-
-N = np.array(N, dtype=np.float64)
-err = np.array(err)
-
-plt.scatter(N, err, color="r", label="C-N implicit diffusion")
-plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
-
-plt.xlabel(r"$N$", fontsize="large")
-plt.ylabel(r"L2 norm of absolute error")
-plt.title("Convergence of C-N Implicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
-
-plt.ylim(1.e-6, 1.e-2)
-plt.legend(frameon=False, fontsize="small")
-
-plt.savefig("diffimplicit-converge-{}.pdf".format(C))
-
-
-#-----------------------------------------------------------------------------
-# solution at multiple times
-
-# diffusion coefficient
-k = 1.0
-
-# reference time
-t0 = 1.e-4
-
-# state coeffs
-phi1 = 1.0
-phi2 = 2.0
-
-
-nx = 128
-
-# a characteristic timescale for diffusion is 0.5*dx**2/k
-dt = 0.5/(k*nx**2)
-tmax = 100*dt
-
-# analytic on a fine grid
-nx_analytic = 512
-
-CFL = [0.8, 8.0]
-
-for C in CFL:
 
     plt.clf()
 
-    ntimes = 5
-    tend = tmax/2.0**(ntimes-1)
+    N = np.array(N, dtype=np.float64)
+    err = np.array(err)
 
-    c = ["0.5", "r", "g", "b", "k"]
+    plt.scatter(N, err, color="r", label="C-N implicit diffusion")
+    plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
+               color="k", label="$\mathcal{O}(\Delta x^2)$")
 
-    while tend <= tmax:
+    plt.xlabel(r"$N$", fontsize="large")
+    plt.ylabel(r"L2 norm of absolute error")
+    plt.title("Convergence of C-N Implicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
 
-        g = Grid1d(nx, ng=2)
-        s = Simulation(g, k=k)
-        s.init_cond("gaussian", t0, phi1, phi2)
-        s.evolve(C, tend)
-
-        ga = Grid1d(nx_analytic, ng=2)
-        xc = 0.5*(ga.xmin + ga.xmax)
-        phi_analytic = ga.phi_a(tend, k, t0, phi1, phi2)
-
-        color = c.pop()
-        plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
-                   "x", color=color, label="$t = %g$ s" % (tend))
-        plt.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1],
-                   color=color, ls=":")
-
-        tend = 2.0*tend
-
-
-    plt.xlim(0.35,0.65)
-    plt.ylim(0.95,1.7)
-
+    plt.ylim(1.e-6, 1.e-2)
     plt.legend(frameon=False, fontsize="small")
 
-    plt.xlabel("$x$", fontsize="large")
-    plt.ylabel(r"$\phi$", fontsize="large")
-    plt.title(r"implicit diffusion, N = %d, $C$ = %3.2f" % (nx, C))
+    plt.savefig("diffimplicit-converge-{}.pdf".format(C))
 
-    f = plt.gcf()
-    f.set_size_inches(8.0, 6.0)
 
-    plt.savefig("diff-implicit-{}-CFL_{}.pdf".format(nx, C))
+    #-------------------------------------------------------------------------
+    # solution at multiple times
+
+    # diffusion coefficient
+    k = 1.0
+
+    # reference time
+    t0 = 1.e-4
+
+    # state coeffs
+    phi1 = 1.0
+    phi2 = 2.0
+
+    nx = 128
+
+    # a characteristic timescale for diffusion is 0.5*dx**2/k
+    dt = 0.5/(k*nx**2)
+    tmax = 100*dt
+
+    # analytic on a fine grid
+    nx_analytic = 512
+
+    CFL = [0.8, 8.0]
+
+    for C in CFL:
+
+        plt.clf()
+
+        ntimes = 5
+        tend = tmax/2.0**(ntimes-1)
+
+        c = ["0.5", "r", "g", "b", "k"]
+
+        while tend <= tmax:
+
+            g = Grid1d(nx, ng=2)
+            s = Simulation(g, k=k)
+            s.init_cond("gaussian", t0, phi1, phi2)
+            s.evolve(C, tend)
+
+            ga = Grid1d(nx_analytic, ng=2)
+            xc = 0.5*(ga.xmin + ga.xmax)
+            phi_analytic = ga.phi_a(tend, k, t0, phi1, phi2)
+
+            color = c.pop()
+            plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
+                     "x", color=color, label="$t = %g$ s" % (tend))
+            plt.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1],
+                     color=color, ls=":")
+
+            tend = 2.0*tend
+
+
+        plt.xlim(0.35,0.65)
+        plt.ylim(0.95,1.7)
+
+        plt.legend(frameon=False, fontsize="small")
+
+        plt.xlabel("$x$", fontsize="large")
+        plt.ylabel(r"$\phi$", fontsize="large")
+        plt.title(r"implicit diffusion, N = %d, $C$ = %3.2f" % (nx, C))
+
+        f = plt.gcf()
+        f.set_size_inches(8.0, 6.0)
+
+        plt.savefig("diff-implicit-{}-CFL_{}.pdf".format(nx, C))
