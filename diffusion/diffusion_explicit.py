@@ -1,6 +1,6 @@
 # finite-difference implementation of the diffusion equation with first-order
 # explicit time discretization
-# 
+#
 # We are solving phi_t = k phi_xx
 #
 # We run at several resolutions and compute the error.  This uses a
@@ -17,7 +17,7 @@ class Grid1d(object):
 
     def __init__(self, nx, ng=1, xmin=0.0, xmax=1.0):
         """ grid class initialization """
-        
+
         self.nx = nx
         self.ng = ng
 
@@ -77,7 +77,7 @@ class Simulation(object):
         dt = C*0.5*gr.dx**2/self.k
 
         phinew = gr.scratch_array()
-    
+
         while self.t < tmax:
 
             # make sure we end right at tmax
@@ -91,7 +91,7 @@ class Simulation(object):
 
             # loop over zones
             for i in range(g.ilo, g.ihi+1):
-        
+
                 # explicit diffusion
                 phinew[i] = gr.phi[i] + \
                             alpha*(gr.phi[i+1] - 2.0*gr.phi[i] + gr.phi[i-1])
@@ -135,11 +135,11 @@ while tend <= tmax:
     s.evolve(C, tend)
 
     phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
-    
+
     color = c.pop()
-    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
+    plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
                "x", color=color, label="$t = %g$ s" % (tend))
-    plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
+    plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
                color=color, ls=":")
 
     tend = 10.0*tend
@@ -183,7 +183,7 @@ for nx in N:
     s = Simulation(g, k=k)
     s.init_cond("gaussian", t0, phi1, phi2)
     s.evolve(C, tmax)
-    
+
     phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
 
     err.append(g.norm(g.phi - phi_analytic))
@@ -235,10 +235,10 @@ s.init_cond("gaussian", t0, phi1, phi2)
 s.evolve(C, tend)
 
 phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
-    
-plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], 
+
+plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
            "x-", color="r", label="$t = %g$ s" % (tend))
-plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], 
+plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
            color="0.5", ls=":")
 
 plt.xlim(0.35,0.65)
@@ -249,5 +249,5 @@ plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
 ax = plt.gca()
 ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
 ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
- 
+
 plt.savefig("diff-explicit-64-bad.pdf")
