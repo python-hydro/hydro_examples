@@ -61,9 +61,9 @@ if __name__ == "__main__":
         plt.clf()
 
         plt.scatter(N, err_i, color="r", label="C-N implicit diffusion")
-        plt.scatter(N, err_fi, color="g", label="backwards-difference diffusion")
+        plt.scatter(N, err_fi, color="b", label="backwards-difference diffusion")
         if C <= 1:
-            plt.scatter(N, err_e, color="b", label="forward-difference (explicit) diffusion")
+            plt.scatter(N, err_e, color="g", label="forward-difference (explicit) diffusion")
 
         N = np.array(N)
         plt.loglog(N, err_i[len(N)-1]*(N[len(N)-1]/N)**2, 
