@@ -131,7 +131,33 @@ class Grid(object):
         phi[self.nx/2-0.15*self.nx:self.nx/2+0.15*self.nx+1] = 1.0
 
 
-def evolve(nx, kappa, tau, tmax):
+def interpolate(x, phi, phipt):
+    """ find the x position corresponding to phipt """
+
+    idx = (np.where(phi >= 0.5))[0][0]
+    xs   = np.array([x[idx-1],   x[idx],   x[idx+1]])
+    phis = np.array([phi[idx-1], phi[idx], phi[idx+1]])
+
+    xpos = 0.0
+
+    for m in range(len(phis)):
+        # create Lagrange basis polynomial for point m
+        l = None
+        n = 0
+        for n in range(len(phis)):
+            if n == m:
+                continue
+
+            if l == None:
+                l = (phipt - phis[n])/(phis[m] - phis[n])
+            else:
+                l *= (phipt - phis[n])/(phis[m] - phis[n])
+
+        xpos += xs[m]*l
+
+    return xpos
+
+def evolve(nx, kappa, tau, tmax, dovis=0, return_initial=0):
     """
     the main evolution loop.  Evolve
 
@@ -141,7 +167,7 @@ def evolve(nx, kappa, tau, tmax):
     """
 
     # create the grid
-    gr = Grid(nx, ng=1, xmin = 0.0, xmax=50.0,
+    gr = Grid(nx, ng=1, xmin = 0.0, xmax=100.0,
               vars=["phi", "phi1", "phi2"])
 
     # pointers to the data at various stages
@@ -152,8 +178,10 @@ def evolve(nx, kappa, tau, tmax):
     # initialize
     gr.initialize()
 
+    phi_init = phi.copy()
+
     # runtime plotting
-    plt.ion()
+    if dovis == 1: plt.ion()
 
     t = 0.0
     while t < tmax:
@@ -177,13 +205,17 @@ def evolve(nx, kappa, tau, tmax):
 
         t += dt
 
-        plt.clf()
-        plt.plot(gr.x, phi)
-        plt.xlim(gr.xmin,gr.xmax)
-        plt.ylim(0.0,1.0)
-        plt.draw()
+        if dovis == 1:
+            plt.clf()
+            plt.plot(gr.x, phi)
+            plt.xlim(gr.xmin,gr.xmax)
+            plt.ylim(0.0,1.0)
+            plt.draw()
 
-    return phi, gr.x
+    if return_initial == 1:
+        return phi, gr.x, phi_init
+    else:
+        return phi, gr.x
 
 
 # phi is a reaction progress variable, so phi lies between 0 and 1
@@ -191,13 +223,13 @@ def evolve(nx, kappa, tau, tmax):
 kappa = 0.1
 tau = 1.0
 
-tmax1 = 25.0
+tmax1 = 60.0
 
-nx = 512
+nx = 256
 
 phi1, x1 = evolve(nx, kappa, tau, tmax1)
 
-tmax2 = 40.0
+tmax2 = 80.0
 
 phi2, x2 = evolve(nx, kappa, tau, tmax2)
 
@@ -206,21 +238,45 @@ plt.plot(x2, phi2, ls=":")
 plt.savefig("flame.png")
 
 
+# estimate the speed -- interpolate to x corresponding to where phi > 0.2
+xpos1 = interpolate(x1, phi1, 0.2)
+xpos2 = interpolate(x2, phi2, 0.2)
+
+print ((xpos1 - xpos2)/(tmax1 - tmax2), np.sqrt(kappa/tau))
+
 # estimate the speed -- interpolate to x corresponding to where phi > 0.5
-idx = (np.where(phi1 >= 0.5))[0][0]
-print("index = ", idx)
-xa = x1[idx-1]
-xb = x1[idx+1]
-phia = phi1[idx-1]
-phib = phi1[idx+1]
-xpos1 = ((xa - xb)/(phia - phib))*(phia - 0.5) + xa
+xpos1 = interpolate(x1, phi1, 0.5)
+xpos2 = interpolate(x2, phi2, 0.5)
 
-idx = (np.where(phi2 >= 0.5))[0][0]
-xa = x2[idx-1]
-xb = x2[idx+1]
-phia = phi2[idx-1]
-phib = phi2[idx+1]
-xpos2 = ((xa - xb)/(phia - phib))*(phia - 0.5) + xa
+print ((xpos1 - xpos2)/(tmax1 - tmax2), np.sqrt(kappa/tau))
 
-print(xpos1, xpos2)
-print( (xpos1 - xpos2)/(tmax1 - tmax2), np.sqrt(kappa/tau))
+# estimate the speed -- interpolate to x corresponding to where phi > 0.8
+xpos1 = interpolate(x1, phi1, 0.8)
+xpos2 = interpolate(x2, phi2, 0.8)
+
+print ((xpos1 - xpos2)/(tmax1 - tmax2), np.sqrt(kappa/tau))
+
+
+# make a pretty plot
+plt.clf()
+
+dt = 8.0
+for i in range(0, 10):
+    tend = (i+1)*dt
+    p, x, phi0 = evolve(nx, kappa, tau, tend, return_initial=1)
+
+    c = 1.0 - (0.1 + i*0.1)
+    plt.plot(x, p, color=str(c))
+
+plt.plot(x, phi0, ls=":", color="0.5")
+
+plt.xlabel("$x$")
+plt.ylabel("\phi$")
+plt.title(r"Diffusion-Reaction, $N = {}, \, \kappa = {:3.2f}, \, \tau = {:3.2f}, \, \delta t = {:3.2f}$ (between lines)".format(nx, kappa, tau, dt))
+
+plt.tight_layout()
+
+plt.xlim(0, 100)
+plt.savefig("flame_seq.png")
+
+
