@@ -4,7 +4,7 @@ from __future__ import print_function
 
 """
 
-an example of using the multigrid class to solve Laplace's equation via
+an example of using the multigrid class to solve Poisson's equation via
 smoothing only.  Here, we solve
 
 u_xx = sin(x)
