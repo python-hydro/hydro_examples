@@ -50,7 +50,7 @@ class RiemannProblem(object):
 
         return pstar, ustar
 
-    def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
+    def plot_hugoniot(self, pstar, ustar, p_min = 0.0, p_max=1.5, N=200):
 
         p = np.linspace(p_min, p_max, num=N)
         u_left = np.zeros_like(p)
@@ -58,8 +58,8 @@ class RiemannProblem(object):
 
         for n in range(N):
             u_left[n] = self.u_hugoniot(p[n], "left")
-        ish = np.where(p > self.left.p)
-        ir = np.where(p < self.left.p)
+        ish = np.where(p > pstar)
+        ir = np.where(p < pstar)
 
         plt.plot(p[ish], u_left[ish], c="b", ls=":", lw=2)
         plt.plot(p[ir], u_left[ir], c="b", ls="-", lw=2)
@@ -67,8 +67,8 @@ class RiemannProblem(object):
 
         for n in range(N):
             u_right[n] = self.u_hugoniot(p[n], "right")
-        ish = np.where(p > self.right.p)
-        ir = np.where(p < self.right.p)
+        ish = np.where(p > pstar)
+        ir = np.where(p < pstar)
 
         plt.plot(p[ish], u_right[ish], c="r", ls=":", lw=2)
         plt.plot(p[ir], u_right[ir], c="r", ls="-", lw=2)
@@ -112,8 +112,8 @@ if __name__ == "__main__":
 
     rp = RiemannProblem(left, right)
 
-    rp.plot_hugoniot()
-
     pstar, ustar = rp.find_star_state()
+
+    rp.plot_hugoniot(pstar, ustar)
 
     print pstar, ustar
