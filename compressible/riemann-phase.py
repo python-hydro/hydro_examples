@@ -58,8 +58,10 @@ class RiemannProblem(object):
 
         for n in range(N):
             u_left[n] = self.u_hugoniot(p[n], "left")
-        ish = np.where(p > pstar)
-        ir = np.where(p < pstar)
+            
+        # shock for pstar > p; rarefaction for pstar < p
+        ish = np.where(p < pstar)
+        ir = np.where(p > pstar)
 
         plt.plot(p[ish], u_left[ish], c="b", ls=":", lw=2)
         plt.plot(p[ir], u_left[ir], c="b", ls="-", lw=2)
@@ -67,8 +69,8 @@ class RiemannProblem(object):
 
         for n in range(N):
             u_right[n] = self.u_hugoniot(p[n], "right")
-        ish = np.where(p > pstar)
-        ir = np.where(p < pstar)
+        ish = np.where(p < pstar)
+        ir = np.where(p > pstar)
 
         plt.plot(p[ish], u_right[ish], c="r", ls=":", lw=2)
         plt.plot(p[ir], u_right[ir], c="r", ls="-", lw=2)
@@ -102,6 +104,7 @@ class RiemannProblem(object):
         plt.tight_layout()
 
         plt.savefig("riemann-phase.png")
+        plt.savefig("riemann-phase.pdf")
 
 
 if __name__ == "__main__":
