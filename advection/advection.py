@@ -1,12 +1,12 @@
 """
-2nd-order accurate finite-volume implementation of linear advection with 
+2nd-order accurate finite-volume implementation of linear advection with
 piecewise linear slope reconstruction.
 
 We are solving a_t + u a_x = 0
 
 This script defines two classes:
 
- -- the Grid1d class that manages a cell-centered grid and holds the 
+ -- the Grid1d class that manages a cell-centered grid and holds the
     data that lives on that grid
 
  -- the Simulation class that is built on a Grid1d object and defines
@@ -104,7 +104,7 @@ class Simulation:
         """ initialize the data """
         if type == "tophat":
             self.grid.a[:] = 0.0
-            self.grid.a[numpy.logical_and(self.grid.x >= 0.333, 
+            self.grid.a[numpy.logical_and(self.grid.x >= 0.333,
                                           self.grid.x <= 0.666)] = 1.0
 
         elif type == "sine":
@@ -132,7 +132,7 @@ class Simulation:
         slope = g.scratch_array()
 
         g = self.grid
-        
+
         if self.slope_type == "godunov":
 
             # piecewise constant = 0 slopes
@@ -151,16 +151,16 @@ class Simulation:
             # minmod limited slope
             i = g.ilo-1
             while i <= g.ihi+1:
-                slope[i] = minmod( (g.a[i] - g.a[i-1])/g.dx, 
+                slope[i] = minmod( (g.a[i] - g.a[i-1])/g.dx,
                                    (g.a[i+1] - g.a[i])/g.dx )
                 i += 1
-        
+
         elif self.slope_type == "MC":
 
             # MC limiter
             i = g.ilo-1
             while i <= g.ihi+1:
-                slope[i] = minmod(minmod( 2.0*(g.a[i] - g.a[i-1])/g.dx, 
+                slope[i] = minmod(minmod( 2.0*(g.a[i] - g.a[i-1])/g.dx,
                                           2.0*(g.a[i+1] - g.a[i])/g.dx ),
                                   0.5*(g.a[i+1] - g.a[i-1])/g.dx)
                 i += 1
@@ -175,7 +175,7 @@ class Simulation:
 
                 B = minmod( (g.a[i] - g.a[i-1])/g.dx,
                             2.0*(g.a[i+1] - g.a[i])/g.dx )
-            
+
                 slope[i] = maxmod(A, B)
                 i += 1
 
@@ -202,9 +202,9 @@ class Simulation:
 
 
     def riemann(self, al, ar):
-        """ 
+        """
         Riemann problem for advection -- this is simply upwinding,
-        but we return the flux 
+        but we return the flux
         """
 
         if self.u > 0.0:
@@ -251,7 +251,7 @@ class Simulation:
 
             # solve the Riemann problem at all interfaces
             flux = self.riemann(al, ar)
-        
+
             # do the conservative update
             anew = self.update(dt, flux)
 
@@ -280,17 +280,17 @@ if __name__ == "__main__":
     ainit = s.grid.a.copy()
     s.evolve(num_periods=5)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
+    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
                color="r", label="unlimited")
 
     s = Simulation(g, u, C=0.7, slope_type="minmod")
     s.init_cond("tophat")
     s.evolve(num_periods=5)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
+    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
                color="b", label="minmod limiter")
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], 
+    pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1],
                ls=":", color="0.5", label="exact")
 
     pylab.legend(frameon=False, loc="best")
@@ -311,44 +311,71 @@ if __name__ == "__main__":
     ng = 2
     N = [32, 64, 128, 256, 512]
 
-    err = []
+    err_nolim = []
+    err_lim = []
+    err_lim2 = []
+
+    u = 1.0
 
     for nx in N:
 
-        g = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        # no limiting
+        gu = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        su = Simulation(gu, u, C=0.8, slope_type="centered")
 
-        u = 1.0
-        s = Simulation(g, u, C=0.8, slope_type="centered")
-        s.init_cond("gaussian")
-        ainit = s.grid.a.copy()
+        su.init_cond("gaussian")
+        ainit = su.grid.a.copy()
 
-        s.evolve(num_periods=5)
+        su.evolve(num_periods=5)
 
-        # compute the error
-        err.append(g.norm(g.a - ainit))
-        print g.dx, nx, err[-1]
+        err_nolim.append(gu.norm(gu.a - ainit))
+
+        # MC limiting
+        gl = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        sl = Simulation(gl, u, C=0.8, slope_type="MC")
+        sl.init_cond("gaussian")
+        ainit = sl.grid.a.copy()
+        sl.evolve(num_periods=5)
+
+        err_lim.append(gl.norm(gl.a - ainit))
+
+        # minmod limiting
+        gl2 = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        sl2 = Simulation(gl2, u, C=0.8, slope_type="minmod")
+        sl2.init_cond("gaussian")
+        ainit = sl2.grid.a.copy()
+        sl2.evolve(num_periods=5)
+
+        err_lim2.append(gl2.norm(gl2.a - ainit))
+
+        print g.dx, nx, err_nolim[-1], err_lim[-1], err_lim2[-1]
 
 
     pylab.clf()
 
     N = numpy.array(N, dtype=numpy.float64)
-    err = numpy.array(err)
+    err_nolim = numpy.array(err_nolim)
+    err_lim = numpy.array(err_lim)
+    err_lim2 = numpy.array(err_lim2)
 
-    pylab.scatter(N, err, color="r")
-    pylab.plot(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
+    pylab.scatter(N, err_nolim, color="r", label="unlimited center")
+    pylab.scatter(N, err_lim, color="b", label="MC")
+    pylab.scatter(N, err_lim2, color="g", label="minmod")
+    pylab.plot(N, err_nolim[len(N)-1]*(N[len(N)-1]/N)**2,
                color="k", label=r"$\mathcal{O}(\Delta x^2)$")
 
     ax = pylab.gca()
     ax.set_xscale('log')
     ax.set_yscale('log')
-    
+
     pylab.xlabel("N")
-    pylab.ylabel(r"$\|\| a^\mathrm{final} - a^\mathrm{init} \|\|_2$", 
+    pylab.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                  fontsize=16)
 
     pylab.legend(frameon=False)
-    
+
     pylab.savefig("plm-converge.png")
+    pylab.savefig("plm-converge.pdf")
 
 
     #-------------------------------------------------------------------------
@@ -387,7 +414,7 @@ if __name__ == "__main__":
         s.evolve(num_periods=5)
 
         pylab.subplot(232)
-        
+
         pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
         pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
@@ -404,7 +431,7 @@ if __name__ == "__main__":
 
         pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
         pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
-        
+
         pylab.title("minmod limiter")
 
 
@@ -440,6 +467,5 @@ if __name__ == "__main__":
         f.set_size_inches(10.0,7.0)
 
         pylab.tight_layout()
-        
-        pylab.savefig("fv-{}-limiters.png".format(p), bbox_inches="tight")
 
+        pylab.savefig("fv-{}-limiters.pdf".format(p), bbox_inches="tight")
