@@ -18,30 +18,32 @@ M. Zingale
 
 """
 
-import numpy
-import pylab
+from __future__ import print_function
+
+import numpy as np
+import matplotlib.pyplot as plt
 import math
 
 
 # helper functions for the limiting
 def minmod(a, b):
-    if (abs(a) < abs(b) and a*b > 0.0):
+    if abs(a) < abs(b) and a*b > 0.0:
         return a
-    elif (abs(b) < abs(a) and a*b > 0.0):
+    elif abs(b) < abs(a) and a*b > 0.0:
         return b
     else:
         return 0.0
 
 def maxmod(a, b):
-    if (abs(a) > abs(b) and a*b > 0.0):
+    if abs(a) > abs(b) and a*b > 0.0:
         return a
-    elif (abs(b) > abs(a) and a*b > 0.0):
+    elif abs(b) > abs(a) and a*b > 0.0:
         return b
     else:
         return 0.0
 
 
-class Grid1d:
+class Grid1d(object):
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0):
 
@@ -58,39 +60,36 @@ class Grid1d:
 
         # physical coords -- cell-centered, left and right edges
         self.dx = (xmax - xmin)/(nx)
-        self.x = xmin + (numpy.arange(nx+2*ng)-ng+0.5)*self.dx
+        self.x = xmin + (np.arange(nx+2*ng)-ng+0.5)*self.dx
 
         # storage for the solution
-        self.a = numpy.zeros((nx+2*ng), dtype=numpy.float64)
+        self.a = np.zeros((nx+2*ng), dtype=np.float64)
 
 
     def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
-        return numpy.zeros((self.nx+2*self.ng), dtype=numpy.float64)
+        return np.zeros((self.nx+2*self.ng), dtype=np.float64)
 
 
     def fill_BCs(self):
         """ fill all single ghostcell with periodic boundary conditions """
 
-        n = 0
-        while n < self.ng:
+        for n in range(self.ng):
             # left boundary
             self.a[self.ilo-1-n] = self.a[self.ihi-n]
 
             # right boundary
             self.a[self.ihi+1+n] = self.a[self.ilo+n]
-            n += 1
-
 
     def norm(self, e):
         """ return the norm of quantity e which lives on the grid """
-        if not len(e) == (2*self.ng + self.nx):
+        if len(e) != 2*self.ng + self.nx:
             return None
 
-        return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
+        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
 
 
-class Simulation:
+class Simulation(object):
 
     def __init__(self, grid, u, C=0.8, slope_type="centered"):
         self.grid = grid
@@ -104,14 +103,14 @@ class Simulation:
         """ initialize the data """
         if type == "tophat":
             self.grid.a[:] = 0.0
-            self.grid.a[numpy.logical_and(self.grid.x >= 0.333,
-                                          self.grid.x <= 0.666)] = 1.0
+            self.grid.a[np.logical_and(self.grid.x >= 0.333,
+                                       self.grid.x <= 0.666)] = 1.0
 
         elif type == "sine":
-            self.grid.a[:] = numpy.sin(2.0*math.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
+            self.grid.a[:] = np.sin(2.0*math.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
 
         elif type == "gaussian":
-            self.grid.a[:] = 1.0 + numpy.exp(-60.0*(self.grid.x - 0.5)**2)
+            self.grid.a[:] = 1.0 + np.exp(-60.0*(self.grid.x - 0.5)**2)
 
 
     def timestep(self):
@@ -141,35 +140,28 @@ class Simulation:
         elif self.slope_type == "centered":
 
             # unlimited centered difference slopes
-            i = g.ilo-1
-            while i <= g.ihi+1:
+            for i in range(g.ilo-1, g.ihi+2):
                 slope[i] = 0.5*(g.a[i+1] - g.a[i-1])/g.dx
-                i += 1
 
         elif self.slope_type == "minmod":
 
             # minmod limited slope
-            i = g.ilo-1
-            while i <= g.ihi+1:
+            for i in range(g.ilo-1, g.ihi+2):
                 slope[i] = minmod( (g.a[i] - g.a[i-1])/g.dx,
                                    (g.a[i+1] - g.a[i])/g.dx )
-                i += 1
 
         elif self.slope_type == "MC":
 
             # MC limiter
-            i = g.ilo-1
-            while i <= g.ihi+1:
+            for i in range(g.ilo-1, g.ihi+2):
                 slope[i] = minmod(minmod( 2.0*(g.a[i] - g.a[i-1])/g.dx,
                                           2.0*(g.a[i+1] - g.a[i])/g.dx ),
                                   0.5*(g.a[i+1] - g.a[i-1])/g.dx)
-                i += 1
 
         elif self.slope_type == "superbee":
 
             # superbee limiter
-            i = g.ilo-1
-            while i <= g.ihi+1:
+            for i in range(g.ilo-1, g.ihi+2):
                 A = minmod( (g.a[i+1] - g.a[i])/g.dx,
                             2.0*(g.a[i] - g.a[i-1])/g.dx )
 
@@ -177,8 +169,6 @@ class Simulation:
                             2.0*(g.a[i+1] - g.a[i])/g.dx )
 
                 slope[i] = maxmod(A, B)
-                i += 1
-
 
 
         # loop over all the interfaces.  Here, i refers to the left
@@ -187,16 +177,13 @@ class Simulation:
         al = g.scratch_array()
         ar = g.scratch_array()
 
-        i = g.ilo
-        while i <= g.ihi+1:
+        for i in range(g.ilo, g.ihi+2):
 
             # left state on the current interface comes from zone i-1
             al[i] = g.a[i-1] + 0.5*g.dx*(1.0 - u*dt/g.dx)*slope[i-1]
 
             # right state on the current interface comes from zone i
             ar[i] = g.a[i] - 0.5*g.dx*(1.0 + u*dt/g.dx)*slope[i]
-
-            i += 1
 
         return al, ar
 
@@ -235,7 +222,7 @@ class Simulation:
 
 
         # main evolution loop
-        while (self.t < tmax):
+        while self.t < tmax:
 
             # fill the boundary conditions
             g.fill_BCs()
@@ -243,7 +230,7 @@ class Simulation:
             # get the timestep
             dt = self.timestep()
 
-            if (self.t + dt > tmax):
+            if self.t + dt > tmax:
                 dt = tmax - self.t
 
             # get the interface states
@@ -280,25 +267,25 @@ if __name__ == "__main__":
     ainit = s.grid.a.copy()
     s.evolve(num_periods=5)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
-               color="r", label="unlimited")
+    plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
+             color="r", label="unlimited")
 
     s = Simulation(g, u, C=0.7, slope_type="minmod")
     s.init_cond("tophat")
     s.evolve(num_periods=5)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
-               color="b", label="minmod limiter")
+    plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
+             color="b", label="minmod limiter")
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1],
-               ls=":", color="0.5", label="exact")
+    plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1],
+             ls=":", color="0.5", label="exact")
 
-    pylab.legend(frameon=False, loc="best")
+    plt.legend(frameon=False, loc="best")
 
-    pylab.xlabel(r"$x$")
-    pylab.ylabel(r"$a$")
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$a$")
 
-    pylab.savefig("fv-advect.eps")
+    plt.savefig("fv-advect.eps")
 
 
 
@@ -348,34 +335,34 @@ if __name__ == "__main__":
 
         err_lim2.append(gl2.norm(gl2.a - ainit))
 
-        print g.dx, nx, err_nolim[-1], err_lim[-1], err_lim2[-1]
+        print(g.dx, nx, err_nolim[-1], err_lim[-1], err_lim2[-1])
 
 
-    pylab.clf()
+    plt.clf()
 
-    N = numpy.array(N, dtype=numpy.float64)
-    err_nolim = numpy.array(err_nolim)
-    err_lim = numpy.array(err_lim)
-    err_lim2 = numpy.array(err_lim2)
+    N = np.array(N, dtype=np.float64)
+    err_nolim = np.array(err_nolim)
+    err_lim = np.array(err_lim)
+    err_lim2 = np.array(err_lim2)
 
-    pylab.scatter(N, err_nolim, color="r", label="unlimited center")
-    pylab.scatter(N, err_lim, color="b", label="MC")
-    pylab.scatter(N, err_lim2, color="g", label="minmod")
-    pylab.plot(N, err_nolim[len(N)-1]*(N[len(N)-1]/N)**2,
-               color="k", label=r"$\mathcal{O}(\Delta x^2)$")
+    plt.scatter(N, err_nolim, color="r", label="unlimited center")
+    plt.scatter(N, err_lim, color="b", label="MC")
+    plt.scatter(N, err_lim2, color="g", label="minmod")
+    plt.plot(N, err_nolim[len(N)-1]*(N[len(N)-1]/N)**2,
+             color="k", label=r"$\mathcal{O}(\Delta x^2)$")
 
-    ax = pylab.gca()
+    ax = plt.gca()
     ax.set_xscale('log')
     ax.set_yscale('log')
 
-    pylab.xlabel("N")
-    pylab.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
-                 fontsize=16)
+    plt.xlabel("N")
+    plt.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
+               fontsize=16)
 
-    pylab.legend(frameon=False)
+    plt.legend(frameon=False)
 
-    pylab.savefig("plm-converge.png")
-    pylab.savefig("plm-converge.pdf")
+    plt.savefig("plm-converge.png")
+    plt.savefig("plm-converge.pdf")
 
 
     #-------------------------------------------------------------------------
@@ -391,7 +378,7 @@ if __name__ == "__main__":
     g= Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 
     for p in ["gaussian", "tophat"]:
-        pylab.clf()
+        plt.clf()
 
         s = Simulation(g, u, C=0.8, slope_type="godunov")
         s.init_cond(p)
@@ -399,12 +386,12 @@ if __name__ == "__main__":
 
         s.evolve(num_periods=5)
 
-        pylab.subplot(231)
+        plt.subplot(231)
 
-        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-        pylab.title("piecewise constant")
+        plt.title("piecewise constant")
 
 
         s = Simulation(g, u, C=0.8, slope_type="centered")
@@ -413,12 +400,12 @@ if __name__ == "__main__":
 
         s.evolve(num_periods=5)
 
-        pylab.subplot(232)
+        plt.subplot(232)
 
-        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-        pylab.title("centered (unlimited)")
+        plt.title("centered (unlimited)")
 
 
         s = Simulation(g, u, C=0.8, slope_type="minmod")
@@ -427,12 +414,12 @@ if __name__ == "__main__":
 
         s.evolve(num_periods=5)
 
-        pylab.subplot(233)
+        plt.subplot(233)
 
-        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-        pylab.title("minmod limiter")
+        plt.title("minmod limiter")
 
 
         s = Simulation(g, u, C=0.8, slope_type="MC")
@@ -441,12 +428,12 @@ if __name__ == "__main__":
 
         s.evolve(num_periods=5)
 
-        pylab.subplot(234)
+        plt.subplot(234)
 
-        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-        pylab.title("MC limiter")
+        plt.title("MC limiter")
 
 
         s = Simulation(g, u, C=0.8, slope_type="superbee")
@@ -455,17 +442,17 @@ if __name__ == "__main__":
 
         s.evolve(num_periods=5)
 
-        pylab.subplot(235)
+        plt.subplot(235)
 
-        pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        pylab.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
 
-        pylab.title("superbee limiter")
+        plt.title("superbee limiter")
 
 
-        f = pylab.gcf()
+        f = plt.gcf()
         f.set_size_inches(10.0,7.0)
 
-        pylab.tight_layout()
+        plt.tight_layout()
 
-        pylab.savefig("fv-{}-limiters.pdf".format(p), bbox_inches="tight")
+        plt.savefig("fv-{}-limiters.pdf".format(p), bbox_inches="tight")
