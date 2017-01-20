@@ -1,16 +1,23 @@
-# 2nd-order accurate finite-volume implementation of the inviscid Burger's 
+# 2nd-order accurate finite-volume implementation of the inviscid Burger's
 # equation with piecewise linear slope reconstruction
-# 
+#
 # We are solving u_t + u u_x = 0 with outflow boundary conditions
 #
 # M. Zingale (2013-03-26)
 
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+import matplotlib as mpl
 import sys
 
-class Grid1d:
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+
+mpl.rcParams['font.size'] = 12
+mpl.rcParams['legend.fontsize'] = 'large'
+mpl.rcParams['figure.titlesize'] = 'medium'
+
+class Grid1d(object):
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0, bc="outflow"):
 
@@ -53,17 +60,17 @@ class Grid1d:
 
         elif self.bc == "outflow":
 
-            # left boundary                                                         
-            self.u[0:self.ilo] = self.u[self.ilo]                                   
-            
-            # right boundary                                                        
-            self.u[self.ihi+1:] = self.u[self.ihi]                                  
-  
+            # left boundary
+            self.u[0:self.ilo] = self.u[self.ilo]
+
+            # right boundary
+            self.u[self.ihi+1:] = self.u[self.ihi]
+
         else:
             sys.exit("invalid BC")
 
 
-class Simulation:
+class Simulation(object):
 
     def __init__(self, grid):
         self.grid = grid
@@ -73,19 +80,19 @@ class Simulation:
     def init_cond(self, type="tophat"):
 
         if type == "tophat":
-            self.grid.u[np.logical_and(self.grid.x >= 0.333, 
+            self.grid.u[np.logical_and(self.grid.x >= 0.333,
                                           self.grid.x <= 0.666)] = 1.0
 
         elif type == "sine":
             self.grid.u[:] = 1.0
 
-            index = np.logical_and(self.grid.x >= 0.333, 
+            index = np.logical_and(self.grid.x >= 0.333,
                                       self.grid.x <= 0.666)
             self.grid.u[index] += \
-                0.5*np.sin(2.0*math.pi*(self.grid.x[index]-0.333)/0.333)
+                0.5*np.sin(2.0*np.pi*(self.grid.x[index]-0.333)/0.333)
 
         elif type == "rarefaction":
-            self.grid.u[:] = 1.0 
+            self.grid.u[:] = 1.0
             self.grid.u[self.grid.x > 0.5] = 2.0
 
 
@@ -106,7 +113,7 @@ class Simulation:
 
         u = self.grid.u
 
-        # this is the MC limiter from van Leer (1977), as given in 
+        # this is the MC limiter from van Leer (1977), as given in
         # LeVeque (2002).  Note that this is slightly different than
         # the expression from Colella (1990)
 
@@ -122,7 +129,7 @@ class Simulation:
         d1 = 2.0*np.where(np.fabs(dl) < np.fabs(dr), dl, dr)
         d2 = np.where(np.fabs(dc) < np.fabs(d1), dc, d1)
         ldeltau = np.where(dl*dr > 0.0, d2, 0.0)
-        
+
         # now the interface states.  Note that there are 1 more interfaces
         # than zones
         ul = g.scratch_array()
@@ -133,18 +140,18 @@ class Simulation:
         #  --+-----------------+------------------+
         #     ^       i       ^ ^        i+1
         #     ur(i)     ul(i+1) ur(i+1)
-        #       
+        #
         ur[ib:ie+1] = u[ib:ie+1] - \
-                      0.5*(1.0 + u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1] 
+                      0.5*(1.0 + u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1]
 
         ul[ib+1:ie+2] = u[ib:ie+1] + \
                         0.5*(1.0 - u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1]
- 
+
         return ul, ur
 
 
     def riemann(self, ul, ur):
-        """ 
+        """
         Riemann problem for Burgers' equation.
         """
 
@@ -195,7 +202,7 @@ class Simulation:
 
             # solve the Riemann problem at all interfaces
             flux = self.riemann(ul, ur)
-        
+
             # do the conservative update
             unew = self.update(dt, flux)
 
@@ -223,7 +230,7 @@ plt.clf()
 
 s = Simulation(g)
 
-for i in range(0,10):
+for i in range(0, 10):
     tend = (i+1)*0.02*tmax
     s.init_cond("sine")
 
@@ -237,11 +244,11 @@ for i in range(0,10):
 
 
 g = s.grid
-plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
 
 plt.xlabel("$x$")
 plt.ylabel("$u$")
-plt.savefig("fv-burger-sine.png")
+plt.savefig("fv-burger-sine.pdf")
 
 
 #-----------------------------------------------------------------------------
@@ -262,7 +269,7 @@ plt.clf()
 
 s = Simulation(g)
 
-for i in range(0,10):
+for i in range(0, 10):
     tend = (i+1)*0.02*tmax
 
     s.init_cond("rarefaction")
@@ -275,10 +282,9 @@ for i in range(0,10):
     plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
 
 
-plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.5")
+plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
 
 plt.xlabel("$x$")
 plt.ylabel("$u$")
 
-plt.savefig("fv-burger-rarefaction.png")
-
+plt.savefig("fv-burger-rarefaction.pdf")
