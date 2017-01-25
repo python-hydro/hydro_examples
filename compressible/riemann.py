@@ -21,6 +21,9 @@ class RiemannProblem(object):
         self.right = right_state
         self.gamma = gamma
 
+        self.ustar = None
+        self.pstar = None
+
     def u_hugoniot(self, p, side):
 
         if side == "left":
@@ -46,13 +49,15 @@ class RiemannProblem(object):
 
     def find_star_state(self, p_min=0.001, p_max=1000.0):
         # we need to root-find on
-        pstar = optimize.brentq(lambda p: self.u_hugoniot(p, "left") - self.u_hugoniot(p, "right"),
+        self.pstar = optimize.brentq(lambda p: self.u_hugoniot(p, "left") - self.u_hugoniot(p, "right"),
                                p_min, p_max)
-        ustar = self.u_hugoniot(pstar, "left")
+        self.ustar = self.u_hugoniot(self.pstar, "left")
 
-        return pstar, ustar
 
-    def plot_hugoniot(self, pstar, ustar, p_min = 0.0, p_max=1.5, N=200):
+    def sample_solution(self, time, xmin, xmax, npts):
+        pass
+
+    def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
 
         p = np.linspace(p_min, p_max, num=N)
         u_left = np.zeros_like(p)
@@ -62,8 +67,8 @@ class RiemannProblem(object):
             u_left[n] = self.u_hugoniot(p[n], "left")
 
         # shock for pstar > p; rarefaction for pstar < p
-        ish = np.where(p < pstar)
-        ir = np.where(p > pstar)
+        ish = np.where(p < self.pstar)
+        ir = np.where(p > self.pstar)
 
         plt.plot(p[ish], u_left[ish], c="C0", ls=":", lw=2)
         plt.plot(p[ir], u_left[ir], c="C0", ls="-", lw=2)
@@ -71,8 +76,8 @@ class RiemannProblem(object):
 
         for n in range(N):
             u_right[n] = self.u_hugoniot(p[n], "right")
-        ish = np.where(p < pstar)
-        ir = np.where(p > pstar)
+        ish = np.where(p < self.pstar)
+        ir = np.where(p > self.pstar)
 
         plt.plot(p[ish], u_right[ish], ls=":", lw=2, color="C1")
         plt.plot(p[ir], u_right[ir], ls="-", lw=2, color="C1")

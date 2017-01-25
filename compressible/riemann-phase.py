@@ -14,11 +14,9 @@ if __name__ == "__main__":
     right = riemann.State(p=0.1, u=0.0, rho=0.125)
 
     rp = riemann.RiemannProblem(left, right)
-
-    pstar, ustar = rp.find_star_state()
-
-    rp.plot_hugoniot(pstar, ustar)
+    rp.find_star_state()
+    rp.plot_hugoniot()
 
     plt.savefig("riemann-phase.pdf")
 
-    print(pstar, ustar)
+    print(rp.pstar, rp.ustar)
