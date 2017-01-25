@@ -54,8 +54,29 @@ class RiemannProblem(object):
         self.ustar = self.u_hugoniot(self.pstar, "left")
 
 
-    def sample_solution(self, time, xmin, xmax, npts):
-        pass
+    def sample_solution(self, time, npts, xmin=0.0, xmax=1.0):
+        dx = (xmax - xmin)/npts
+        xjump = 0.5*(xmin + xmax)
+
+        x = np.linspace(xmin, xmax, npts, endpoint=False) + 0.5*dx
+        xi = (x - xjump)/time
+
+        # which side of the contact are we on?
+        chi = np.sign(xi - self.ustar)
+
+        for n in range(npts):
+            if chi[n] == -1:
+                rho_s = self.left.rho
+                u_s = self.left.u
+                p_s = self.left.p
+            else:
+                rho_s = self.right.rho
+                u_s = self.right.u
+                p_s = self.right.p
+
+            c = np.sqrt(self.gamma*ps/rhos)
+
+            
 
     def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
 
