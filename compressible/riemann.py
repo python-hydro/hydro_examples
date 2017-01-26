@@ -7,15 +7,20 @@ import numpy as np
 import scipy.optimize as optimize
 
 class State(object):
+    """ a simple object to hold a primitive variable state """
+
     def __init__(self, p=1.0, u=0.0, rho=1.0):
-         self.p = p
-         self.u = u
-         self.rho = rho
+        self.p = p
+        self.u = u
+        self.rho = rho
 
     def __str__(self):
         return "rho: {}; u: {}; p: {}".format(self.rho, self.u, self.p)
 
 class RiemannProblem(object):
+    """ a class to define a Riemann problem.  It takes a left
+        and right state.  Note: we assume a constant gamma """
+
     def __init__(self, left_state, right_state, gamma=1.4):
         self.left = left_state
         self.right = right_state
@@ -25,6 +30,7 @@ class RiemannProblem(object):
         self.pstar = None
 
     def u_hugoniot(self, p, side):
+        """ define the Hugoniot curve, u(p) """
 
         if side == "left":
             state = self.left
@@ -48,6 +54,8 @@ class RiemannProblem(object):
         return u
 
     def find_star_state(self, p_min=0.001, p_max=1000.0):
+        """ root find the Hugoniot curve to find ustar, pstar """
+
         # we need to root-find on
         self.pstar = optimize.brentq(lambda p: self.u_hugoniot(p, "left") - self.u_hugoniot(p, "right"),
                                p_min, p_max)
@@ -55,10 +63,10 @@ class RiemannProblem(object):
 
 
     def sample_solution(self, time, npts, xmin=0.0, xmax=1.0):
-        # given the star state (ustar, pstar), sample the solution
-        # for npts points between xmin and xmax at the given time.
-        #
-        # this is a similarity solution in xi = x/t
+        """given the star state (ustar, pstar), sample the solution for npts
+        points between xmin and xmax at the given time.
+        
+        this is a similarity solution in xi = x/t """
 
         # we write it all explicitly out here -- this could be vectorized
         # better.
@@ -202,6 +210,7 @@ class RiemannProblem(object):
         return x, np.array(rho_v), np.array(u_v), np.array(p_v)
 
     def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
+        """ plot the Hugoniot curves """
 
         p = np.linspace(p_min, p_max, num=N)
         u_left = np.zeros_like(p)
@@ -253,5 +262,3 @@ class RiemannProblem(object):
         plt.legend(legs, legnames, frameon=False, loc="best")
 
         plt.tight_layout()
-
-
