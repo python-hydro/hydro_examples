@@ -23,8 +23,43 @@ if __name__ == "__main__":
 
     rp = riemann.RiemannProblem(left, right)
     rp.find_star_state()
-    rp.plot_hugoniot()
 
-    plt.savefig("riemann-phase.pdf")
+    x, rho, u, p = rp.sample_solution(0.2, 128)
 
-    print(rp.pstar, rp.ustar)
+    plt.subplot(311)
+
+    plt.plot(x, rho)
+
+    plt.ylabel(r"$\rho$")
+
+    plt.xlim(0, 1)
+    plt.tick_params(axis="x", labelbottom="off")
+
+    plt.subplot(312)
+
+    plt.plot(x, u)
+
+    plt.ylabel(r"$u$")
+
+    plt.xlim(0, 1)
+    plt.tick_params(axis="x", labelbottom="off")
+
+
+    plt.subplot(313)
+
+    plt.plot(x, p)
+
+    plt.ylabel(r"$p$")
+    plt.xlabel(r"$x$")
+
+    plt.xlim(0, 1)
+
+    f = plt.gcf()
+    f.set_size_inches(6.0, 9.0)
+
+    plt.tight_layout()
+
+    plt.savefig("riemann-sod.pdf")
+
+
+

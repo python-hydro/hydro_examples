@@ -137,6 +137,3 @@ plt.legend(frameon=False, loc="best")
 plt.tight_layout()
 
 plt.savefig("fdadvect-implicit.pdf")
-
-
-    
