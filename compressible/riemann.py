@@ -55,6 +55,14 @@ class RiemannProblem(object):
 
 
     def sample_solution(self, time, npts, xmin=0.0, xmax=1.0):
+        # given the star state (ustar, pstar), sample the solution
+        # for npts points between xmin and xmax at the given time.
+        #
+        # this is a similarity solution in xi = x/t
+
+        # we write it all explicitly out here -- this could be vectorized
+        # better.
+
         dx = (xmax - xmin)/npts
         xjump = 0.5*(xmin + xmax)
 
@@ -64,19 +72,134 @@ class RiemannProblem(object):
         # which side of the contact are we on?
         chi = np.sign(xi - self.ustar)
 
+        gam = self.gamma
+        gam_fac = (gam - 1.0)/(gam + 1.0)
+
+        rho_v = []
+        u_v = []
+        p_v = []
+
         for n in range(npts):
-            if chi[n] == -1:
-                rho_s = self.left.rho
-                u_s = self.left.u
-                p_s = self.left.p
+
+            if xi[n] > self.ustar:
+                # we are in the R* or R region
+                p_ratio = self.pstar/self.right.p
+
+                c_r = np.sqrt(gam*self.right.p/self.right.rho)
+
+                # isentropic (Toro eq. 4.54)
+                cstar = c_r*p_ratio**((gam-1.0)/(2*gam))
+
+                # is the right wave in our a shock or rarefaction?
+                if self.pstar > self.right.p:
+                    # shock
+
+                    # Toro, eq. 4.57
+                    rhostar = self.right.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
+
+                    # Toro, eq. 4.59
+                    S = self.right.u + c_r*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
+
+                    # are we to the left or right of the shock?
+                    if xi[n] > S:
+                        # R region
+                        rho = self.right.rho
+                        u = self.right.u
+                        p = self.right.p
+                    else:
+                        # R* region
+                        rho = rhostar
+                        u = self.ustar
+                        p = self.pstar
+
+                else:
+                    # rarefaction -- the rarefaction is spread out, so
+                    # find the speed of the head and tail of the rarefaction fan
+                    lambda_head = self.right.u + c_r
+                    lambda_tail = self.ustar + cstar
+
+                    if xi[n] > lambda_head:
+                        # R region
+                        rho = self.right.rho
+                        u = self.right.u
+                        p = self.right.p
+
+                    elif xi[n] < lambda_tail:
+                        # R* region
+                        # isentropic density (Toro 4.60)
+                        rho = self.right.rho*p_ratio**(1.0/gam)
+                        u = self.ustar
+                        p = self.pstar
+
+                    else:
+                        # we are in the fan -- Toro 4.63
+                        rho = self.right.rho * (2/(gam + 1.0) - gam_fac*(self.right.u - xi[n])/c_r)**(2.0/(gam-1.0))
+                        u = 2.0/(gam + 1.0) * ( -c_r + 0.5*(gam - 1.0)*self.right.u + xi[n])
+                        p = self.right.p * (2/(gam + 1.0) - gam_fac*(self.right.u - xi[n])/c_r)**(2.0*gam/(gam-1.0))
+
             else:
-                rho_s = self.right.rho
-                u_s = self.right.u
-                p_s = self.right.p
+                # we are in the L or L* region
+                p_ratio = self.pstar/self.left.p
 
-            c = np.sqrt(self.gamma*ps/rhos)
+                c_l = np.sqrt(gam*self.left.p/self.left.rho)
 
-            
+                # isentropic (Toro eq. 4.54)
+                cstar = c_l*p_ratio**((gam-1.0)/(2*gam))
+
+                # is the left wave in our a shock or rarefaction?
+                if self.pstar > self.left.p:
+                    # shock
+
+                    # Toro, eq. 4.50
+                    rhostar = self.left.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
+
+                    # Toro, eq. 4.59
+                    S = self.left.u - c_l*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
+
+                    # are we to the left or right of the shock?
+                    if xi[n] < S:
+                        # L region
+                        rho = self.left.rho
+                        u = self.left.u
+                        p = self.left.p
+                    else:
+                        # L* region
+                        rho = rhostar
+                        u = self.ustar
+                        p = self.pstar
+
+                else:
+                    # rarefaction -- the rarefaction is spread out, so
+                    # find the speed of the head and tail of the rarefaction fan
+                    lambda_head = self.left.u - c_l
+                    lambda_tail = self.ustar - cstar
+
+                    if xi[n] < lambda_head:
+                        # L region
+                        rho = self.left.rho
+                        u = self.left.u
+                        p = self.left.p
+
+                    elif xi[n] > lambda_tail:
+                        # L* region
+                        # isentropic density (Toro 4.53)
+                        rho = self.left.rho*p_ratio**(1.0/gam)
+                        u = self.ustar
+                        p = self.pstar
+
+                    else:
+                        # we are in the fan -- Toro 4.56
+                        rho = self.left.rho * (2/(gam + 1.0) + gam_fac*(self.left.u - xi[n])/c_l)**(2.0/(gam-1.0))
+                        u = 2.0/(gam + 1.0) * (c_l + 0.5*(gam - 1.0)*self.left.u + xi[n])
+                        p = self.left.p * (2/(gam + 1.0) + gam_fac*(self.left.u - xi[n])/c_l)**(2.0*gam/(gam-1.0))
+
+
+            # store
+            rho_v.append(rho)
+            u_v.append(u)
+            p_v.append(p)
+
+        return x, np.array(rho_v), np.array(u_v), np.array(p_v)
 
     def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
 
