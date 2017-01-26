@@ -10,6 +10,10 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
 
 class FDGrid(object):
 
@@ -93,13 +97,14 @@ Clist = [0.1, 0.5, 0.9]
 u = 1.0
 
 # upwind
-for C in Clist:
+for n, C in enumerate(Clist):
     solve_advection(g, u, C)
+
+    if n == 0:
+        plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
     plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
              label=r"$C = {}$".format(C))
-
-plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
 plt.xlabel(r"$x$", fontsize=16)
 plt.ylabel(r"$a$", fontsize=16)
@@ -119,10 +124,10 @@ for C in Clist:
     plt.clf()
     solve_advection(g, u, C, method="FTCS", tmax_factor=0.1)
 
+    plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
+
     plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], 
              label=r"$C = {}$".format(C))
-
-    plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
     plt.xlabel(r"$x$", fontsize=16)
     plt.ylabel(r"$a$", fontsize=16)

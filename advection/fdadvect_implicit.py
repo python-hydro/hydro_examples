@@ -17,9 +17,14 @@
 #
 # No ghost points are used here.
 
-import numpy
-import pylab
-import sys
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+import matplotlib as mpl
+
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
 
 class FDgrid:
 
@@ -39,15 +44,15 @@ class FDgrid:
 
         # physical coords
         self.dx = (xmax - xmin)/(nx-1)
-        self.x = xmin + numpy.arange(nx)*self.dx
+        self.x = xmin + np.arange(nx)*self.dx
 
         # storage for the solution
-        self.a = numpy.zeros((nx), dtype=numpy.float64)
-        self.ainit = numpy.zeros((nx), dtype=numpy.float64)
+        self.a = np.zeros((nx), dtype=np.float64)
+        self.ainit = np.zeros((nx), dtype=np.float64)
 
     def scratchArray(self):
         """ return a scratch array dimensioned for our grid """
-        return numpy.zeros((self.nx), dtype=numpy.float64)
+        return np.zeros((self.nx), dtype=np.float64)
 
     def fillBCs(self):
         """ we don't explicitly update point 0, since it is identical
@@ -65,17 +70,17 @@ def evolve(nx, C, u, tmax):
     t = 0.0
 
     # initialize the data -- tophat
-    g.a[numpy.logical_and(g.x >= 0.333, g.x <= 0.666)] = 1.0
+    g.a[np.logical_and(g.x >= 0.333, g.x <= 0.666)] = 1.0
 
     g.ainit = g.a.copy()
 
     # evolution loop
-    A = numpy.zeros((g.nx-1, g.nx-1), dtype=numpy.float64)
+    A = np.zeros((g.nx-1, g.nx-1), dtype=np.float64)
 
     # fill the boundary conditions
     g.fillBCs()
 
-    while (t < tmax):
+    while t < tmax:
 
         # create the matrix
     
@@ -91,7 +96,7 @@ def evolve(nx, C, u, tmax):
         b = g.a[g.ilo:g.ihi+1]
 
         # solve the system
-        anew = numpy.linalg.solve(A, b)
+        anew = np.linalg.solve(A, b)
 
         g.a[g.ilo:g.ihi+1] = anew[:]
     
@@ -111,24 +116,27 @@ tmax = 1.0/u
 nx = 65
 CFL = [0.5, 1.0, 10.0]
 
-for C in CFL:
+for n, C in enumerate(CFL):
 
     g = evolve(nx, C, u, tmax)
 
-    pylab.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], label="$C = %3.1f$" % (C))
+    if n == 0:
+        plt.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
 
-pylab.plot(g.x[g.ilo:g.ihi+1], g.ainit[g.ilo:g.ihi+1], ls=":", label="exact")
-
-#pylab.title("N = %d" % (nx))
-pylab.xlabel("$x$", fontsize=16)
-pylab.ylabel("$a$", fontsize=16)
+    plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], label="$C = %3.1f$" % (C))
 
 
-pylab.legend(frameon=False, loc="best")
 
-pylab.tight_layout()
+#plt.title("N = %d" % (nx))
+plt.xlabel("$x$", fontsize=16)
+plt.ylabel("$a$", fontsize=16)
 
-pylab.savefig("fdadvect-implicit.eps")
+
+plt.legend(frameon=False, loc="best")
+
+plt.tight_layout()
+
+plt.savefig("fdadvect-implicit.pdf")
 
 
     

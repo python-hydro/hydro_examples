@@ -22,7 +22,10 @@ from __future__ import print_function
 
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+import matplotlib as mpl
+
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
 
 
 # helper functions for the limiting
@@ -107,7 +110,7 @@ class Simulation(object):
                                        self.grid.x <= 0.666)] = 1.0
 
         elif type == "sine":
-            self.grid.a[:] = np.sin(2.0*math.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
+            self.grid.a[:] = np.sin(2.0*np.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
 
         elif type == "gaussian":
             self.grid.a[:] = 1.0 + np.exp(-60.0*(self.grid.x - 0.5)**2)
@@ -267,25 +270,26 @@ if __name__ == "__main__":
     ainit = s.grid.a.copy()
     s.evolve(num_periods=5)
 
+    plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1],
+             ls=":", label="exact")
+
     plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
-             color="r", label="unlimited")
+             label="unlimited")
 
     s = Simulation(g, u, C=0.7, slope_type="minmod")
     s.init_cond("tophat")
     s.evolve(num_periods=5)
 
     plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1],
-             color="b", label="minmod limiter")
+             label="minmod limiter")
 
-    plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1],
-             ls=":", color="0.5", label="exact")
 
     plt.legend(frameon=False, loc="best")
 
     plt.xlabel(r"$x$")
     plt.ylabel(r"$a$")
 
-    plt.savefig("fv-advect.eps")
+    plt.savefig("fv-advect.pdf")
 
 
 
@@ -345,9 +349,9 @@ if __name__ == "__main__":
     err_lim = np.array(err_lim)
     err_lim2 = np.array(err_lim2)
 
-    plt.scatter(N, err_nolim, color="r", label="unlimited center")
-    plt.scatter(N, err_lim, color="b", label="MC")
-    plt.scatter(N, err_lim2, color="g", label="minmod")
+    plt.scatter(N, err_nolim, label="unlimited center")
+    plt.scatter(N, err_lim, label="MC")
+    plt.scatter(N, err_lim2, label="minmod")
     plt.plot(N, err_nolim[len(N)-1]*(N[len(N)-1]/N)**2,
              color="k", label=r"$\mathcal{O}(\Delta x^2)$")
 
@@ -361,7 +365,6 @@ if __name__ == "__main__":
 
     plt.legend(frameon=False)
 
-    plt.savefig("plm-converge.png")
     plt.savefig("plm-converge.pdf")
 
 
@@ -388,8 +391,8 @@ if __name__ == "__main__":
 
         plt.subplot(231)
 
-        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1])
 
         plt.title("piecewise constant")
 
@@ -402,8 +405,8 @@ if __name__ == "__main__":
 
         plt.subplot(232)
 
-        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1])
 
         plt.title("centered (unlimited)")
 
@@ -416,8 +419,8 @@ if __name__ == "__main__":
 
         plt.subplot(233)
 
-        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1])
 
         plt.title("minmod limiter")
 
@@ -430,8 +433,8 @@ if __name__ == "__main__":
 
         plt.subplot(234)
 
-        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1])
 
         plt.title("MC limiter")
 
@@ -444,8 +447,8 @@ if __name__ == "__main__":
 
         plt.subplot(235)
 
-        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1], color="r")
-        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":", color="0.5")
+        plt.plot(g.x[g.ilo:g.ihi+1], ainit[g.ilo:g.ihi+1], ls=":")
+        plt.plot(g.x[g.ilo:g.ihi+1], g.a[g.ilo:g.ihi+1])
 
         plt.title("superbee limiter")
 
