@@ -47,6 +47,7 @@ class RiemannProblem(object):
             beta = (self.gamma+1.0)/(self.gamma-1.0)
             u = state.u + s*(2.0*c/np.sqrt(2.0*self.gamma*(self.gamma-1.0)))* \
                 (1.0 - p/state.p)/np.sqrt(1.0 + beta*p/state.p)
+
         else:
             if p < state.p:
                 # rarefaction
@@ -77,7 +78,7 @@ class RiemannProblem(object):
         self.pstar = optimize.brentq(
             lambda p: self.u_hugoniot(p, "left", shock=True) - self.u_hugoniot(p, "right", shock=True),
             p_min, p_max)
-        self.ustar = self.u_hugoniot(self.pstar, "left")
+        self.ustar = self.u_hugoniot(self.pstar, "left", shock=True)
 
 
     def sample_solution(self, time, npts, xmin=0.0, xmax=1.0):
