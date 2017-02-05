@@ -109,115 +109,66 @@ class RiemannProblem(object):
 
             if xi[n] > self.ustar:
                 # we are in the R* or R region
-                p_ratio = self.pstar/self.right.p
+                state = self.right
+                sgn = 1.0
+            else:
+                # we are in the L* or L region
+                state = self.left
+                sgn = -1.0
 
-                c_r = np.sqrt(gam*self.right.p/self.right.rho)
+            p_ratio = self.pstar/state.p
 
-                # isentropic (Toro eq. 4.54)
-                cstar = c_r*p_ratio**((gam-1.0)/(2*gam))
+            c = np.sqrt(gam*state.p/state.rho)
 
-                # is the right wave in our a shock or rarefaction?
-                if self.pstar > self.right.p:
-                    # shock
+            # isentropic (Toro eq. 4.54 / 4.61)
+            cstar = c*p_ratio**((gam-1.0)/(2*gam))
 
-                    # Toro, eq. 4.57
-                    rhostar = self.right.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
+            # is the right wave in our a shock or rarefaction?
+            if self.pstar > state.p:
+                # shock
 
-                    # Toro, eq. 4.59
-                    S = self.right.u + c_r*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
+                # Toro, eq. 4.50 / 4.57
+                rhostar = state.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
 
-                    # are we to the left or right of the shock?
-                    if xi[n] > S:
-                        # R region
-                        rho = self.right.rho
-                        u = self.right.u
-                        p = self.right.p
-                    else:
-                        # R* region
-                        rho = rhostar
-                        u = self.ustar
-                        p = self.pstar
+                # Toro, eq. 4.52 / 4.59
+                S = state.u + sgn*c*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
 
+                # are we to the left or right of the shock?
+                if (sgn > 0 and xi[n] > S) or (sgn < 0 and xi[n] < S):
+                    # R/L region
+                    rho = state.rho
+                    u = state.u
+                    p = state.p
                 else:
-                    # rarefaction -- the rarefaction is spread out, so
-                    # find the speed of the head and tail of the rarefaction fan
-                    lambda_head = self.right.u + c_r
-                    lambda_tail = self.ustar + cstar
-
-                    if xi[n] > lambda_head:
-                        # R region
-                        rho = self.right.rho
-                        u = self.right.u
-                        p = self.right.p
-
-                    elif xi[n] < lambda_tail:
-                        # R* region
-                        # isentropic density (Toro 4.60)
-                        rho = self.right.rho*p_ratio**(1.0/gam)
-                        u = self.ustar
-                        p = self.pstar
-
-                    else:
-                        # we are in the fan -- Toro 4.63
-                        rho = self.right.rho * (2/(gam + 1.0) - gam_fac*(self.right.u - xi[n])/c_r)**(2.0/(gam-1.0))
-                        u = 2.0/(gam + 1.0) * ( -c_r + 0.5*(gam - 1.0)*self.right.u + xi[n])
-                        p = self.right.p * (2/(gam + 1.0) - gam_fac*(self.right.u - xi[n])/c_r)**(2.0*gam/(gam-1.0))
+                    # * region
+                    rho = rhostar
+                    u = self.ustar
+                    p = self.pstar
 
             else:
-                # we are in the L or L* region
-                p_ratio = self.pstar/self.left.p
+                # rarefaction -- the rarefaction is spread out, so
+                # find the speed of the head and tail of the rarefaction fan
+                lambda_head = state.u + sgn*c
+                lambda_tail = self.ustar + sgn*cstar
 
-                c_l = np.sqrt(gam*self.left.p/self.left.rho)
+                if (sgn > 0 and xi[n] > lambda_head) or (sgn < 0 and xi[n] < lambda_head):
+                    # R/L region
+                    rho = state.rho
+                    u = state.u
+                    p = state.p
 
-                # isentropic (Toro eq. 4.54)
-                cstar = c_l*p_ratio**((gam-1.0)/(2*gam))
-
-                # is the left wave in our a shock or rarefaction?
-                if self.pstar > self.left.p:
-                    # shock
-
-                    # Toro, eq. 4.50
-                    rhostar = self.left.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
-
-                    # Toro, eq. 4.59
-                    S = self.left.u - c_l*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
-
-                    # are we to the left or right of the shock?
-                    if xi[n] < S:
-                        # L region
-                        rho = self.left.rho
-                        u = self.left.u
-                        p = self.left.p
-                    else:
-                        # L* region
-                        rho = rhostar
-                        u = self.ustar
-                        p = self.pstar
+                elif (sgn > 0 and xi[n] < lambda_tail) or (sgn < 0 and xi[n] > lambda_tail):
+                    # * region
+                    # isentropic density (Toro 4.53 / 4.60)
+                    rho = state.rho*p_ratio**(1.0/gam)
+                    u = self.ustar
+                    p = self.pstar
 
                 else:
-                    # rarefaction -- the rarefaction is spread out, so
-                    # find the speed of the head and tail of the rarefaction fan
-                    lambda_head = self.left.u - c_l
-                    lambda_tail = self.ustar - cstar
-
-                    if xi[n] < lambda_head:
-                        # L region
-                        rho = self.left.rho
-                        u = self.left.u
-                        p = self.left.p
-
-                    elif xi[n] > lambda_tail:
-                        # L* region
-                        # isentropic density (Toro 4.53)
-                        rho = self.left.rho*p_ratio**(1.0/gam)
-                        u = self.ustar
-                        p = self.pstar
-
-                    else:
-                        # we are in the fan -- Toro 4.56
-                        rho = self.left.rho * (2/(gam + 1.0) + gam_fac*(self.left.u - xi[n])/c_l)**(2.0/(gam-1.0))
-                        u = 2.0/(gam + 1.0) * (c_l + 0.5*(gam - 1.0)*self.left.u + xi[n])
-                        p = self.left.p * (2/(gam + 1.0) + gam_fac*(self.left.u - xi[n])/c_l)**(2.0*gam/(gam-1.0))
+                    # we are in the fan -- Toro 4.56 / 4.63
+                    rho = state.rho * (2/(gam + 1.0) - sgn*gam_fac*(state.u - xi[n])/c)**(2.0/(gam-1.0))
+                    u = 2.0/(gam + 1.0) * ( -sgn*c + 0.5*(gam - 1.0)*state.u + xi[n])
+                    p = state.p * (2/(gam + 1.0) - sgn*gam_fac*(state.u - xi[n])/c)**(2.0*gam/(gam-1.0))
 
 
             # store
