@@ -29,8 +29,9 @@ class RiemannProblem(object):
         self.ustar = None
         self.pstar = None
 
-    def u_hugoniot(self, p, side):
-        """ define the Hugoniot curve, u(p) """
+    def u_hugoniot(self, p, side, shock=False):
+        """define the Hugoniot curve, u(p).  If shock=True, we do a 2-shock
+        solution"""
 
         if side == "left":
             state = self.left
@@ -41,15 +42,21 @@ class RiemannProblem(object):
 
         c = np.sqrt(self.gamma*state.p/state.rho)
 
-        if p < state.p:
-            # rarefaction
-            u = state.u + s*(2.0*c/(self.gamma-1.0))* \
-                (1.0 - (p/state.p)**((self.gamma-1.0)/(2.0*self.gamma)))
-        else:
+        if shock:
             # shock
             beta = (self.gamma+1.0)/(self.gamma-1.0)
             u = state.u + s*(2.0*c/np.sqrt(2.0*self.gamma*(self.gamma-1.0)))* \
                 (1.0 - p/state.p)/np.sqrt(1.0 + beta*p/state.p)
+        else:
+            if p < state.p:
+                # rarefaction
+                u = state.u + s*(2.0*c/(self.gamma-1.0))* \
+                    (1.0 - (p/state.p)**((self.gamma-1.0)/(2.0*self.gamma)))
+            else:
+                # shock
+                beta = (self.gamma+1.0)/(self.gamma-1.0)
+                u = state.u + s*(2.0*c/np.sqrt(2.0*self.gamma*(self.gamma-1.0)))* \
+                    (1.0 - p/state.p)/np.sqrt(1.0 + beta*p/state.p)
 
         return u
 
@@ -57,8 +64,19 @@ class RiemannProblem(object):
         """ root find the Hugoniot curve to find ustar, pstar """
 
         # we need to root-find on
-        self.pstar = optimize.brentq(lambda p: self.u_hugoniot(p, "left") - self.u_hugoniot(p, "right"),
-                               p_min, p_max)
+        self.pstar = optimize.brentq(
+            lambda p: self.u_hugoniot(p, "left") - self.u_hugoniot(p, "right"),
+            p_min, p_max)
+        self.ustar = self.u_hugoniot(self.pstar, "left")
+
+
+    def find_2shock_star_state(self, p_min=0.001, p_max=1000.0):
+        """ root find the Hugoniot curve to find ustar, pstar """
+
+        # we need to root-find on
+        self.pstar = optimize.brentq(
+            lambda p: self.u_hugoniot(p, "left", shock=True) - self.u_hugoniot(p, "right", shock=True),
+            p_min, p_max)
         self.ustar = self.u_hugoniot(self.pstar, "left")
 
 
@@ -209,7 +227,7 @@ class RiemannProblem(object):
 
         return x, np.array(rho_v), np.array(u_v), np.array(p_v)
 
-    def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=200):
+    def plot_hugoniot(self, p_min = 0.0, p_max=1.5, N=500, gray=False):
         """ plot the Hugoniot curves """
 
         p = np.linspace(p_min, p_max, num=N)
@@ -223,18 +241,78 @@ class RiemannProblem(object):
         ish = np.where(p < self.pstar)
         ir = np.where(p > self.pstar)
 
-        plt.plot(p[ish], u_left[ish], c="C0", ls=":", lw=2)
-        plt.plot(p[ir], u_left[ir], c="C0", ls="-", lw=2)
-        plt.scatter([self.left.p], [self.left.u], marker="x", c="C0", s=40)
+        if gray:
+            color = "0.5"
+        else:
+            color = "C0"
+
+        plt.plot(p[ish], u_left[ish], c=color, ls="-", lw=2)
+        plt.plot(p[ir], u_left[ir], c=color, ls=":", lw=2)
+        plt.scatter([self.left.p], [self.left.u], marker="x", c=color, s=40)
 
         for n in range(N):
             u_right[n] = self.u_hugoniot(p[n], "right")
         ish = np.where(p < self.pstar)
         ir = np.where(p > self.pstar)
 
-        plt.plot(p[ish], u_right[ish], ls=":", lw=2, color="C1")
-        plt.plot(p[ir], u_right[ir], ls="-", lw=2, color="C1")
-        plt.scatter([self.right.p], [self.right.u], marker="x", c="C1", s=40)
+        du = 0.025*(max(np.max(u_left), np.max(u_right)) -
+                    min(np.min(u_left), np.min(u_right)))
+
+        if not gray:
+            plt.text(self.left.p, self.left.u+du, "left",
+                     horizontalalignment="center", color=color)
+
+        if gray:
+            color = "0.5"
+        else:
+            color = "C1"
+
+        plt.plot(p[ish], u_right[ish], c=color, ls="-", lw=2)
+        plt.plot(p[ir], u_right[ir], c=color, ls=":", lw=2)
+        plt.scatter([self.right.p], [self.right.u], marker="x", c=color, s=40)
+
+        if not gray:
+            plt.text(self.right.p, self.right.u+du, "right",
+                     horizontalalignment="center", color=color)
+
+        plt.xlim(p_min, p_max)
+
+        plt.xlabel(r"$p$", fontsize="large")
+        plt.ylabel(r"$u$", fontsize="large")
+
+        if not gray:
+            legs = []
+            legnames = []
+
+            legs.append(plt.Line2D((0,1),(0,0), color="0.5", ls="-", marker=None))
+            legnames.append("shock")
+
+            legs.append(plt.Line2D((0,1),(0,0), color="0.5", ls=":", marker=None))
+            legnames.append("rarefaction")
+
+            plt.legend(legs, legnames, frameon=False, loc="best")
+
+        plt.tight_layout()
+
+
+    def plot_2shock_hugoniot(self, p_min = 0.0, p_max=1.5, N=500):
+        """ plot the Hugoniot curves under the 2-shock approximation"""
+
+        p = np.linspace(p_min, p_max, num=N)
+        u_left = np.zeros_like(p)
+        u_right = np.zeros_like(p)
+
+        for n in range(N):
+            u_left[n] = self.u_hugoniot(p[n], "left", shock=True)
+
+        plt.plot(p, u_left, c="C0", ls="-", lw=2, zorder=100)
+        plt.scatter([self.left.p], [self.left.u], marker="x", c="C0", s=40, zorder=100)
+
+        for n in range(N):
+            u_right[n] = self.u_hugoniot(p[n], "right", shock=True)
+
+        plt.plot(p, u_right, c="C1", ls="-", lw=2, zorder=100)
+        plt.scatter([self.right.p], [self.right.u], marker="x", c="C1", s=40, zorder=100)
 
         du = 0.025*(max(np.max(u_left), np.max(u_right)) -
                     min(np.min(u_left), np.min(u_right)))
@@ -249,16 +327,5 @@ class RiemannProblem(object):
 
         plt.xlabel(r"$p$", fontsize="large")
         plt.ylabel(r"$u$", fontsize="large")
-
-        legs = []
-        legnames = []
-
-        legs.append(plt.Line2D((0,1),(0,0), color="C0", ls=":", marker=None))
-        legnames.append("shock")
-
-        legs.append(plt.Line2D((0,1),(0,0), color="C1", ls="-", marker=None))
-        legnames.append("rarefaction")
-
-        plt.legend(legs, legnames, frameon=False, loc="best")
 
         plt.tight_layout()
