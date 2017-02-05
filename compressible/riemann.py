@@ -189,9 +189,9 @@ class RiemannProblem(object):
         for n in range(N):
             u_left[n] = self.u_hugoniot(p[n], "left")
 
-        # shock for pstar > p; rarefaction for pstar < p
-        ish = np.where(p < self.pstar)
-        ir = np.where(p > self.pstar)
+        # shock for p > p_s; rarefaction otherwise
+        ish = np.where(p > self.left.p)
+        ir = np.where(p < self.left.p)
 
         if gray:
             color = "0.5"
@@ -202,17 +202,18 @@ class RiemannProblem(object):
         plt.plot(p[ir], u_left[ir], c=color, ls=":", lw=2)
         plt.scatter([self.left.p], [self.left.u], marker="x", c=color, s=40)
 
-        for n in range(N):
-            u_right[n] = self.u_hugoniot(p[n], "right")
-        ish = np.where(p < self.pstar)
-        ir = np.where(p > self.pstar)
-
         du = 0.025*(max(np.max(u_left), np.max(u_right)) -
                     min(np.min(u_left), np.min(u_right)))
 
         if not gray:
             plt.text(self.left.p, self.left.u+du, "left",
                      horizontalalignment="center", color=color)
+
+
+        for n in range(N):
+            u_right[n] = self.u_hugoniot(p[n], "right")
+        ish = np.where(p > self.right.p)
+        ir = np.where(p < self.right.p)
 
         if gray:
             color = "0.5"

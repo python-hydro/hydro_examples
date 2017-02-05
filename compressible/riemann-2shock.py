@@ -26,12 +26,14 @@ if __name__ == "__main__":
     rp.find_2shock_star_state()
     rp.plot_2shock_hugoniot()
 
+    print("2 shock: ", rp.pstar, rp.ustar)
+
     rp.find_star_state()
     rp.plot_hugoniot(gray=True)
 
-    plt.savefig("riemann-2shock-sod-phase.pdf")
+    print("normal: ", rp.pstar, rp.ustar)
 
-    print(rp.pstar, rp.ustar)
+    plt.savefig("riemann-2shock-sod-phase.pdf")
 
     plt.clf()
 
