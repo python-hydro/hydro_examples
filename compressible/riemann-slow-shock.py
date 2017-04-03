@@ -17,9 +17,15 @@ mpl.rcParams['figure.titlesize'] = 'medium'
 
 if __name__ == "__main__":
 
-    # setup the problem -- Sod
-    left = riemann.State(p=100.0, u=-1.9336, rho=5.6698)
-    right = riemann.State(p=1.0, u=-10.9636, rho=1.0)
+    # setup the problem -- slow shock
+
+    # stationary shock
+    #left = riemann.State(p=100.0, u=-1.9336, rho=5.6698)
+    #right = riemann.State(p=1.0, u=-10.9636, rho=1.0)
+
+    # slow shock
+    left = riemann.State(p=100.0, u=-1.5336, rho=5.6698)
+    right = riemann.State(p=1.0, u=-10.5636, rho=1.0)
 
     rp = riemann.RiemannProblem(left, right)
     rp.find_star_state()
@@ -59,7 +65,17 @@ if __name__ == "__main__":
 
     plt.tight_layout()
 
-    plt.savefig("riemann-sod.pdf")
+    plt.savefig("riemann-slowshock.pdf")
+
+    gamma = rp.gamma
+    e = p/rho/(gamma - 1.0)
+
+    # output the solution
+    with open("slowshock-exact.out", "w") as f:
+        for n in range(len(x)):
+            f.write("{:20.10g} {:20.10g} {:20.10g} {:20.10g} {:20.10g}\n".format(x[n], rho[n], u[n], p[n], e[n]))
+
+
 
 
 
