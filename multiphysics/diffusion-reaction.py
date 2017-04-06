@@ -14,7 +14,15 @@ import numpy as np
 from scipy import linalg
 from scipy.integrate import ode
 import sys
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+
+mpl.rcParams['font.size'] = 12
+mpl.rcParams['legend.fontsize'] = 'large'
+mpl.rcParams['figure.titlesize'] = 'medium'
 
 def frhs(t, phi, tau):
     """ reaction ODE righthand side """
@@ -128,7 +136,7 @@ class Grid(object):
 
         phi = self.data["phi"]
         phi[:] = 0.0
-        phi[self.nx/2-0.15*self.nx:self.nx/2+0.15*self.nx+1] = 1.0
+        phi[self.nx//2-int(0.15*self.nx):self.nx//2+int(0.15*self.nx)+1] = 1.0
 
 
 def interpolate(x, phi, phipt):
@@ -268,15 +276,13 @@ for i in range(0, 10):
     c = 1.0 - (0.1 + i*0.1)
     plt.plot(x, p, color=str(c))
 
-plt.plot(x, phi0, ls=":", color="0.5")
+plt.plot(x, phi0, ls=":", color="0.9", zorder=-1)
 
 plt.xlabel("$x$")
-plt.ylabel("\phi$")
-plt.title(r"Diffusion-Reaction, $N = {}, \, \kappa = {:3.2f}, \, \tau = {:3.2f}, \, \delta t = {:3.2f}$ (between lines)".format(nx, kappa, tau, dt))
-
+plt.ylabel("$\phi$")
+plt.title(r"Diffusion-Reaction, $N = {}, \, \kappa = {:3.2f}, \, \tau = {:3.2f}$".format(nx, kappa, tau, dt))
+#, \, \delta t = {:3.2f}$ (between lines)
 plt.tight_layout()
 
 plt.xlim(0, 100)
-plt.savefig("flame_seq.png")
-
-
+plt.savefig("flame_seq.pdf")
