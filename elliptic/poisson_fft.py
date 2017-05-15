@@ -7,22 +7,30 @@
 #
 # Note: we need a periodic problem for an FFT
 
+from __future__ import print_function
 
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import matplotlib as mpl
 
+# Use LaTeX for rendering
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+mpl.rcParams['font.size'] = 12
+mpl.rcParams['legend.fontsize'] = 'large'
+mpl.rcParams['figure.titlesize'] = 'medium'
 
 # the analytic solution
 def true(x,y):
-    pi = math.pi
+    pi = np.pi
     return np.sin(2.0*pi*x)**2*np.cos(4.0*pi*y) + \
         np.sin(4.0*pi*x)*np.cos(2.0*pi*y)**2
 
 
 # the righthand side
 def frhs(x,y):
-    pi = math.pi
+    pi = np.pi
     return 8.0*pi**2*np.cos(4.0*pi*y)*(np.cos(4.0*pi*x) - 
                                           np.sin(4.0*pi*x)) - \
            16.0*pi**2*(np.sin(4.0*pi*x)*np.cos(2.0*pi*y)**2 + 
@@ -74,8 +82,8 @@ def doit(Nx, Ny, do_plot=False):
     # the 0 component is not a physical frequency, but rather it is
     # the DC signal.  Don't mess with it, since we'll divide by zero
     oldDC = F[0,0]
-    F = 0.5*F/( (np.cos(2.0*math.pi*kx2d/Nx) - 1.0)/dx**2 +
-                (np.cos(2.0*math.pi*ky2d/Ny) - 1.0)/dy**2)
+    F = 0.5*F/( (np.cos(2.0*np.pi*kx2d/Nx) - 1.0)/dx**2 +
+                (np.cos(2.0*np.pi*ky2d/Ny) - 1.0)/dy**2)
 
     F[0,0] = oldDC
 
@@ -119,9 +127,9 @@ plt.clf()
 N = np.array(N, dtype=np.float64)
 err = np.array(err, dtype=np.float64)
 
-print N
-print type(N)
-print err
+print(N)
+print(type(N))
+print(err)
 
 plt.scatter(N, err, marker="x", color="r")
 plt.plot(N, err[0]*(N[0]/N)**2, "--", color="k", label="$\mathcal{O}(\Delta x^2)$")
