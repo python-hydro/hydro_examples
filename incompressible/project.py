@@ -285,8 +285,9 @@ axes = AxesGrid(f, 111,
 ax = axes[0]
 img = ax.imshow(np.transpose(udOrig[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
-
 cb = axes.cbar_axes[0].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("original u")
 
 
@@ -295,6 +296,8 @@ img = ax.imshow(np.transpose(vdOrig[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
 
 cb = axes.cbar_axes[1].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("original v")
 
 
@@ -302,6 +305,8 @@ ax = axes[2]
 img = ax.imshow(np.transpose(ud[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
 cb = axes.cbar_axes[2].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("\'polluted\' u")
 
 
@@ -309,6 +314,8 @@ ax = axes[3]
 img = ax.imshow(np.transpose(vd[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
 cb = axes.cbar_axes[3].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("\'polluted\' v")
 
 
@@ -316,6 +323,8 @@ ax = axes[4]
 img = ax.imshow(np.transpose(unew[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
 cb = axes.cbar_axes[4].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("projected u")
 
 
@@ -323,10 +332,13 @@ ax = axes[5]
 img = ax.imshow(np.transpose(vnew[gr.ilo:gr.ihi+1,gr.jlo:gr.jhi+1]),
                 interpolation="nearest", origin="lower")
 cb = axes.cbar_axes[5].colorbar(img)
+cb.solids.set_rasterized(True)
+cb.solids.set_edgecolor("face")
 ax.set_title("projected v")
+ax.xaxis.get_major_locator().set_params(nbins=7)
 
 f = plt.gcf()
-f.set_size_inches(6.0,8.0)
+f.set_size_inches(7.0,8.0)
 
 #plt.tight_layout()
 
