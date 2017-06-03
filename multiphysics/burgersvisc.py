@@ -43,6 +43,10 @@ class Grid1d(object):
         return np.zeros((2*self.ng+self.nx), dtype=np.float64)
 
 
+    def norm(self, e):
+        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+
+        
     def fill_BCs(self, var):
 
         if not var in self.data.keys():
@@ -53,6 +57,21 @@ class Grid1d(object):
         # Neumann BCs
         vp[0:self.ilo+1] = vp[self.ilo]
         vp[self.ihi+1:] = vp[self.ihi]
+
+    def restrict(self, fac=2):
+        """ restrict the data q that lives on this grid by a 
+        factor fac and return the new data"""
+        
+        # we require fac to be a multiple of 2
+
+        gnew = Grid1d(self.nx//fac, ng=self.ng, 
+                      xmin=self.xmin, xmax=self.xmax, vars=self.data.keys())
+
+        for v in self.data:
+            b = self.data[v][self.ilo:self.ihi+1]
+            gnew.data[v][gnew.ilo:gnew.ihi+1] = \
+                        np.mean(b.reshape(-1, fac), axis=1)
+        return gnew
 
 
 class Simulation(object):
@@ -120,7 +139,7 @@ class Simulation(object):
 
         return unew
 
-    def advect(self, S, dt):
+    def advect(self, S, dt, limit=1):
         """ compute the advective term that updates u in time.  Here, S is
         a source term """
 
@@ -143,8 +162,11 @@ class Simulation(object):
         dl[ib:ie+1] = np.fabs(u[ib+1:ie+2] - u[ib  :ie+1])
         dr[ib:ie+1] = np.fabs(u[ib  :ie+1] - u[ib-1:ie ])
         
-        minslope = np.minimum(np.fabs(dc), np.minimum(2.0*dl, 2.0*dr))
-        ldeltau = np.where(test > 0.0, minslope, 0.0)*np.sign(dc)
+        if limit:
+            minslope = np.minimum(np.fabs(dc), np.minimum(2.0*dl, 2.0*dr))
+            ldeltau = np.where(test > 0.0, minslope, 0.0)*np.sign(dc)
+        else:
+            ldeltau = dc
 
         # construct the interface states, to second order in space and
         # time
@@ -193,7 +215,7 @@ class Simulation(object):
 
         return lapu
 
-    def evolve(self, eps, cfl, tmax, dovis=0):
+    def evolve(self, eps, cfl, tmax, limit=1, dovis=0):
         """ 
         the main evolution loop.  Evolve 
   
@@ -225,7 +247,7 @@ class Simulation(object):
             S = eps*self.lap()
 
             # construct the advective update
-            A = self.advect(S, dt)
+            A = self.advect(S, dt, limit=limit)
 
             # diffuse for dt
             unew = self.diffuse(eps, A, dt)
@@ -247,43 +269,43 @@ class Simulation(object):
                 plt.draw()
 
 
-nx = 256
-cfl = 0.8
-tmax = 0.2
 
-g1 = Grid1d(nx, ng=2, vars=["u"])
-g2 = Grid1d(nx, ng=2, vars=["u"])
-g3 = Grid1d(nx, ng=2, vars=["u"])
+if __name__ == "__main__":
+    nx = 256
+    cfl = 0.8
+    tmax = 0.2
 
-eps1 = 0.005
-s1 = Simulation(g1)
-s1.init_cond()
-s1.evolve(eps1, cfl, tmax, dovis=0)
+    g1 = Grid1d(nx, ng=2, vars=["u"])
+    g2 = Grid1d(nx, ng=2, vars=["u"])
+    g3 = Grid1d(nx, ng=2, vars=["u"])
 
+    eps1 = 0.005
+    s1 = Simulation(g1)
+    s1.init_cond()
+    s1.evolve(eps1, cfl, tmax, dovis=0)
 
-eps2 = 0.0005
-s2 = Simulation(g2)
-s2.init_cond()
-s2.evolve(eps2, cfl, tmax, dovis=0)
+    eps2 = 0.0005
+    s2 = Simulation(g2)
+    s2.init_cond()
+    s2.evolve(eps2, cfl, tmax, dovis=0)
 
+    eps3 = 0.00005
+    s3 = Simulation(g3)
+    s3.init_cond()
+    s3.evolve(eps3, cfl, tmax, dovis=0)
 
-eps3 = 0.00005
-s3 = Simulation(g3)
-s3.init_cond()
-s3.evolve(eps3, cfl, tmax, dovis=0)
+    u1 = s1.grid.data["u"]
+    plt.plot(g1.x, u1, label=r"$\epsilon = %f$" % (eps1))
 
-u1 = s1.grid.data["u"]
-plt.plot(g1.x, u1, label=r"$\epsilon = %f$" % (eps1))
+    u2 = s2.grid.data["u"]
+    plt.plot(g2.x, u2, label=r"$\epsilon = %f$" % (eps2), ls="--", color="k")
 
-u2 = s2.grid.data["u"]
-plt.plot(g2.x, u2, label=r"$\epsilon = %f$" % (eps2), ls="--", color="k")
+    u3 = s3.grid.data["u"]
+    plt.plot(g3.x, u3, label=r"$\epsilon = %f$" % (eps3), ls=":", color="k")
 
-u3 = s3.grid.data["u"]
-plt.plot(g3.x, u3, label=r"$\epsilon = %f$" % (eps3), ls=":", color="k")
+    plt.legend(frameon=False)
 
-plt.legend(frameon=False)
+    plt.xlim(0.0, 1.0)
 
-plt.xlim(0.0, 1.0)
-
-plt.tight_layout()
-plt.savefig("burgersvisc.pdf")
+    plt.tight_layout()
+    plt.savefig("burgersvisc.pdf")
