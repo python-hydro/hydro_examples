@@ -51,7 +51,7 @@ of the solution array (i.e. excluding the guardcells).
 
 a.x is the coordinate arrays, a.dx is the grid spacings
 
-M. Zingale 
+M. Zingale
 
 """
 
@@ -70,26 +70,26 @@ def _error(myg, r):
     return numpy.sqrt(myg.dx*numpy.sum((r[myg.ilo:myg.ihi+1]**2)) )
 
 
-class CellCenterMG1d:
-    """ 
+class CellCenterMG1d(object):
+    """
     The main multigrid class for cell-centered data.
 
     We require that nx be a power of 2 for simplicity
     """
-    
-    def __init__(self, nx, xmin=0.0, xmax=1.0, 
+
+    def __init__(self, nx, xmin=0.0, xmax=1.0,
                  xl_BC_type="dirichlet", xr_BC_type="dirichlet",
                  alpha=0.0, beta=-1.0,
                  nsmooth=10, nsmooth_bottom=50,
-                 verbose=0, 
+                 verbose=0,
                  true_function=None):
-        
+
         self.nx = nx
         self.ng = 1
 
         self.xmin = xmin
         self.xmax = xmax
-        
+
         self.alpha = alpha
         self.beta = beta
 
@@ -97,7 +97,7 @@ class CellCenterMG1d:
         self.nsmooth_bottom = nsmooth_bottom
 
         self.max_cycles = 100
-        
+
         self.verbose = verbose
 
 
@@ -107,14 +107,14 @@ class CellCenterMG1d:
 
         # a small number used in computing the error, so we don't divide by 0
         self.small = 1.e-16
-        
+
         # keep track of whether we've initialized the solution
         self.initialized_solution = 0
         self.initialized_RHS = 0
-        
+
         # assume that self.nx = 2^(nlevels-1)
         # this defines nlevels such that we end exactly on a 2 zone grid
-        self.nlevels = int(math.log(self.nx)/math.log(2.0)) 
+        self.nlevels = int(math.log(self.nx)/math.log(2.0))
 
         # a multigrid object will be a list of grids
         self.grids = []
@@ -129,7 +129,7 @@ class CellCenterMG1d:
 
         nx_t = 2
         for i in range(self.nlevels):
-            
+
             # create the grid
             my_grid = patch1d.Grid1d(nx_t, ng=self.ng,
                                     xmin=xmin, xmax=xmax)
@@ -156,7 +156,7 @@ class CellCenterMG1d:
 
         self.ilo = soln_grid.ilo
         self.ihi = soln_grid.ihi
-        
+
         self.x  = soln_grid.x
         self.dx = soln_grid.dx
 
@@ -172,11 +172,11 @@ class CellCenterMG1d:
         self.residualError = 1.e33
         self.relativeError = 1.e33
 
-        
+
     def get_solution(self):
         v = self.grids[self.nlevels-1].get_var("v")
         return v.copy()
-        
+
 
     def get_solution_object(self):
         return self.grids[self.nlevels-1]
@@ -213,12 +213,12 @@ class CellCenterMG1d:
         if self.verbose:
             print("Source norm = ", self.source_norm)
 
-        # note: if we wanted to do inhomogeneous Dirichlet BCs, we 
+        # note: if we wanted to do inhomogeneous Dirichlet BCs, we
         # would modify the source term, f, here to include a boundary
         # charge
 
         self.initialized_RHS = 1
-        
+
 
     def _compute_residual(self, level):
         """ compute the residual and store it in the r variable"""
@@ -229,14 +229,14 @@ class CellCenterMG1d:
 
         myg = self.grids[level].grid
 
-        # compute the residual 
+        # compute the residual
         # r = f - alpha phi + beta L phi
         r[myg.ilo:myg.ihi+1] = \
             f[myg.ilo:myg.ihi+1] - self.alpha*v[myg.ilo:myg.ihi+1] + \
-            self.beta*( (v[myg.ilo-1:myg.ihi  ] + v[myg.ilo+1:myg.ihi+2] - 
+            self.beta*( (v[myg.ilo-1:myg.ihi  ] + v[myg.ilo+1:myg.ihi+2] -
                          2.0*v[myg.ilo:myg.ihi+1])/(myg.dx*myg.dx) )
 
-        
+
     def smooth(self, level, nsmooth):
         """ use Gauss-Seidel iterations to smooth """
         v = self.grids[level].get_var("v")
@@ -255,9 +255,9 @@ class CellCenterMG1d:
                 (f[myg.ilo:myg.ihi+1:2] +
                  xcoeff*(v[myg.ilo+1:myg.ihi+2:2] + v[myg.ilo-1:myg.ihi  :2])) / \
                  (self.alpha + 2.0*xcoeff)
-            
+
             self.grids[level].fill_BC("v")
-                                                     
+
             v[myg.ilo+1:myg.ihi+1:2] = \
                 (f[myg.ilo+1:myg.ihi+1:2] +
                  xcoeff*(v[myg.ilo+2:myg.ihi+2:2] + v[myg.ilo  :myg.ihi  :2])) / \
@@ -278,10 +278,10 @@ class CellCenterMG1d:
         # rtol
         if self.verbose:
             print("source norm = ", self.source_norm)
-            
+
         old_solution = self.grids[self.nlevels-1].get_var("v").copy()
-        
-        converged = 0
+
+        residual_error = 1.e33
         cycle = 1
 
         # diagnostics that are returned -- residual error norm and true
@@ -289,7 +289,7 @@ class CellCenterMG1d:
         rlist = []
         elist = []
 
-        while not converged and cycle <= self.max_cycles:
+        while residual_error > rtol and cycle <= self.max_cycles:
 
             # zero out the solution on all but the finest grid
             for level in range(self.nlevels-1):
@@ -300,84 +300,8 @@ class CellCenterMG1d:
                 print("<<< beginning V-cycle (cycle {}) >>>\n".format(cycle))
 
             level = self.nlevels-1
-            while level > 0:
+            self.v_cycle(level)
 
-                fP = self.grids[level]
-                cP = self.grids[level-1]
-
-                # access to the residual
-                r = fP.get_var("r")
-
-                if self.verbose:
-                    self._compute_residual(level)
-
-                    print("  level = {}, nx = {}".format(level, fP.grid.nx))
-                    print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
-            
-                # smooth on the current level
-                self.smooth(level, self.nsmooth)
-
-            
-                # compute the residual
-                self._compute_residual(level)
-
-                if self.verbose:
-                    print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
-
-
-                # restrict the residual down to the RHS of the coarser level
-                f_coarse = cP.get_var("f")
-                f_coarse[:] = fP.restrict("r")
-
-                level -= 1
-
-
-            # solve the discrete coarse problem.  We could use any
-            # number of different matrix solvers here (like CG), but
-            # since we are 2 zone by design at this point, we will
-            # just smooth
-            if self.verbose:
-                print("  bottom solve:")
-
-            bP = self.grids[0]
-
-            if self.verbose:
-                print("  level = {}, nx = {}\n".format(level, bP.grid.nx))
-
-            self.smooth(0, self.nsmooth_bottom)
-
-            bP.fill_BC("v")
-
-            
-            # ascending part
-            for level in range(1, self.nlevels):
-
-                fP = self.grids[level]
-                cP = self.grids[level-1]
-
-                # prolong the error up from the coarse grid
-                e = cP.prolong("v")
-
-                # correct the solution on the current grid
-                v = fP.get_var("v")
-                v += e
-
-                if self.verbose:
-                    self._compute_residual(level)
-                    r = fP.get_var("r")
-
-                    print("  level = {}, nx = {}".format(level, fP.grid.nx))
-
-                    print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
-            
-                # smooth
-                self.smooth(level, self.nsmooth)
-
-                if self.verbose:
-                    self._compute_residual(level)
-
-                    print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
-            
 
             # compute the error with respect to the previous solution
             # this is for diagnostic purposes only -- it is not used to
@@ -393,6 +317,7 @@ class CellCenterMG1d:
 
             # compute the residual error, relative to the source norm
             self._compute_residual(self.nlevels-1)
+            fP = self.grids[level]
             r = fP.get_var("r")
 
             if self.source_norm != 0.0:
@@ -406,21 +331,91 @@ class CellCenterMG1d:
                 self.relative_error = relative_error
                 self.residual_error = residual_error
                 fP.fill_BC("v")
-                
+
             if self.verbose:
                 print("cycle {}: relative err = {}, residual err = {}\n".format(
                     cycle, relative_error, residual_error))
 
             rlist.append(residual_error)
-            
+
             if not self.true_function == None:
                 elist.append(_error(fP.grid, (old_solution - self.true_function(fP.grid.x))))
 
             cycle += 1
-        
+
 
         return elist, rlist
 
 
-        
-        
+    def v_cycle(self, level):
+
+        if level > 0:
+
+            fP = self.grids[level]
+            cP = self.grids[level-1]
+
+            # access to the residual
+            r = fP.get_var("r")
+
+            if self.verbose:
+                self._compute_residual(level)
+
+                print("  level = {}, nx = {}".format(level, fP.grid.nx))
+                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
+
+            # smooth on the current level
+            self.smooth(level, self.nsmooth)
+
+            # compute the residual
+            self._compute_residual(level)
+
+            if self.verbose:
+                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
+
+
+            # restrict the residual down to the RHS of the coarser level
+            f_coarse = cP.get_var("f")
+            f_coarse[:] = fP.restrict("r")
+
+            # solve the coarse problem
+            self.v_cycle(level-1)
+
+
+            # ascending part
+
+            # prolong the error up from the coarse grid
+            e = cP.prolong("v")
+
+            # correct the solution on the current grid
+            v = fP.get_var("v")
+            v += e
+
+            if self.verbose:
+                self._compute_residual(level)
+                r = fP.get_var("r")
+                print("  level = {}, nx = {}".format(level, fP.grid.nx))
+                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
+
+            # smooth
+            self.smooth(level, self.nsmooth)
+
+            if self.verbose:
+                self._compute_residual(level)
+                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
+
+        else:
+            # solve the discrete coarse problem.  We could use any
+            # number of different matrix solvers here (like CG), but
+            # since we are 2 zone by design at this point, we will
+            # just smooth
+            if self.verbose:
+                print("  bottom solve:")
+
+            bP = self.grids[0]
+
+            if self.verbose:
+                print("  level = {}, nx = {}\n".format(level, bP.grid.nx))
+
+            self.smooth(0, self.nsmooth_bottom)
+
+            bP.fill_BC("v")
