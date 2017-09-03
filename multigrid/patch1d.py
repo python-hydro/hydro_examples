@@ -342,7 +342,7 @@ class CellCenterData1d:
 
         # allocate an array for the coarsely gridded data
         ng_c = fG.ng
-        nx_c = fG.nx/2
+        nx_c = fG.nx//2
 
         cData = numpy.zeros((2*ng_c+nx_c), dtype=self.dtype)
 
