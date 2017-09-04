@@ -58,16 +58,15 @@ M. Zingale
 from __future__ import print_function
 
 import math
-
-import numpy
 import sys
+import numpy
 
 import patch1d
 
 def _error(myg, r):
 
     # L2 norm of elements in r, multiplied by dx to normalize
-    return numpy.sqrt(myg.dx*numpy.sum((r[myg.ilo:myg.ihi+1]**2)) )
+    return numpy.sqrt(myg.dx*numpy.sum((r[myg.ilo:myg.ihi+1]**2)))
 
 
 class CellCenterMG1d(object):
@@ -132,7 +131,7 @@ class CellCenterMG1d(object):
 
             # create the grid
             my_grid = patch1d.Grid1d(nx_t, ng=self.ng,
-                                    xmin=xmin, xmax=xmax)
+                                     xmin=xmin, xmax=xmax)
 
             # add a CellCenterData1d object for this level to our list
             self.grids.append(patch1d.CellCenterData1d(my_grid, dtype=numpy.float64))
@@ -157,7 +156,7 @@ class CellCenterMG1d(object):
         self.ilo = soln_grid.ilo
         self.ihi = soln_grid.ihi
 
-        self.x  = soln_grid.x
+        self.x = soln_grid.x
         self.dx = soln_grid.dx
 
         self.soln_grid = soln_grid
@@ -169,8 +168,8 @@ class CellCenterMG1d(object):
         # relative error from the previous cycle, and the residual error
         # (normalized to the source norm)
         self.num_cycles = 0
-        self.residualError = 1.e33
-        self.relativeError = 1.e33
+        self.residual_error = 1.e33
+        self.relative_error = 1.e33
 
 
     def get_solution(self):
@@ -233,8 +232,8 @@ class CellCenterMG1d(object):
         # r = f - alpha phi + beta L phi
         r[myg.ilo:myg.ihi+1] = \
             f[myg.ilo:myg.ihi+1] - self.alpha*v[myg.ilo:myg.ihi+1] + \
-            self.beta*( (v[myg.ilo-1:myg.ihi  ] + v[myg.ilo+1:myg.ihi+2] -
-                         2.0*v[myg.ilo:myg.ihi+1])/(myg.dx*myg.dx) )
+            self.beta*((v[myg.ilo-1:myg.ihi] + v[myg.ilo+1:myg.ihi+2] -
+                        2.0*v[myg.ilo:myg.ihi+1])/(myg.dx*myg.dx))
 
 
     def smooth(self, level, nsmooth):
@@ -266,7 +265,7 @@ class CellCenterMG1d(object):
             self.grids[level].fill_BC("v")
 
 
-    def solve(self, rtol = 1.e-11):
+    def solve(self, rtol=1.e-11):
 
         # start by making sure that we've initialized the solution
         # and the RHS
@@ -326,7 +325,6 @@ class CellCenterMG1d(object):
                 residual_error = _error(fP.grid, r)
 
             if residual_error < rtol:
-                converged = 1
                 self.num_cycles = cycle
                 self.relative_error = relative_error
                 self.residual_error = residual_error
@@ -338,7 +336,7 @@ class CellCenterMG1d(object):
 
             rlist.append(residual_error)
 
-            if not self.true_function == None:
+            if self.true_function is not None:
                 elist.append(_error(fP.grid, (old_solution - self.true_function(fP.grid.x))))
 
             cycle += 1
@@ -361,7 +359,7 @@ class CellCenterMG1d(object):
                 self._compute_residual(level)
 
                 print("  level = {}, nx = {}".format(level, fP.grid.nx))
-                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
+                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r)))
 
             # smooth on the current level
             self.smooth(level, self.nsmooth)
@@ -370,7 +368,7 @@ class CellCenterMG1d(object):
             self._compute_residual(level)
 
             if self.verbose:
-                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
+                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r)))
 
 
             # restrict the residual down to the RHS of the coarser level
@@ -394,14 +392,14 @@ class CellCenterMG1d(object):
                 self._compute_residual(level)
                 r = fP.get_var("r")
                 print("  level = {}, nx = {}".format(level, fP.grid.nx))
-                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r) ))
+                print("  before G-S, residual L2 norm = {}".format(_error(fP.grid, r)))
 
             # smooth
             self.smooth(level, self.nsmooth)
 
             if self.verbose:
                 self._compute_residual(level)
-                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r) ))
+                print("  after G-S, residual L2 norm = {}\n".format(_error(fP.grid, r)))
 
         else:
             # solve the discrete coarse problem.  We could use any
