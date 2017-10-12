@@ -55,8 +55,8 @@ class WENOSimulation(advection.Simulation):
         self.u = u   # the constant advective velocity
         self.C = C   # CFL number
         self.weno_order = weno_order
-    
-    
+
+
     def states(self):
         
         g = self.grid
@@ -66,16 +66,17 @@ class WENOSimulation(advection.Simulation):
         al = weno(self.weno_order, g.a)
         ar[::-1] = weno(self.weno_order, g.a[::-1])
         return al, ar
-    
-    
-    def rk_substep(self, dt):
+
+
+    def rk_substep(self):
         
         g = self.grid
         g.fill_BCs()
         al, ar = self.states()
         flux = self.riemann(al, ar)
         rhs = g.scratch_array()
-        rhs[g.ilo:g.ihi+1] = dt/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
+        rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo-1:g.ihi] - flux[g.ilo:g.ihi+1])
+ #       rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
         return rhs
 
 
@@ -85,7 +86,6 @@ class WENOSimulation(advection.Simulation):
         g = self.grid
 
         tmax = num_periods*self.period()
-
 
         # main evolution loop
         while self.t < tmax:
@@ -102,21 +102,17 @@ class WENOSimulation(advection.Simulation):
             # RK4
             # Store the data at the start of the step
             a_start = g.a.copy()
-            k1 = dt * self.rk_substep(dt)
-            a1 = a_start + k1 / 2
-            g.a = a1
-            k2 = dt * self.rk_substep(dt)
-            a2 = a_start + k2 / 2
-            g.a = a2
-            k3 = dt * self.rk_substep(dt)
-            a3 = a_start + k3
-            g.a = a3
-            k4 = dt * self.rk_substep(dt)
+            k1 = dt * self.rk_substep()
+            g.a = a_start + k1 / 2
+            k2 = dt * self.rk_substep()
+            g.a = a_start + k2 / 2
+            k3 = dt * self.rk_substep()
+            g.a = a_start + k3
+            k4 = dt * self.rk_substep()
             g.a = a_start + (k1 + 2 * (k2 + k3) + k4) / 6
 
             self.t += dt
-    
-    
+
 
 if __name__ == "__main__":
 
@@ -154,26 +150,26 @@ if __name__ == "__main__":
 
     xmin = 0.0
     xmax = 1.0
-    orders = [2, 3]
-#    N = [32, 64, 128, 256, 512]
-    N = [32, 64, 128]
+    orders = [2, 3, 4]
+    N = [32, 64, 128, 256, 512]
+ #   N = [32, 64, 128]
 
     errs = []
 
     u = 1.0
 
     for order in orders:
+        ng = order+1
         errs.append([])
         for nx in N:
             print(order, nx)
-            ng = order+1
             gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
             su = WENOSimulation(gu, u, C=0.5, weno_order=order)
         
             su.init_cond("gaussian")
             ainit = su.grid.a.copy()
         
-            su.evolve(num_periods=5)
+            su.evolve(num_periods=1)
         
             errs[-1].append(gu.norm(gu.a - ainit))
     
@@ -181,8 +177,8 @@ if __name__ == "__main__":
     N = numpy.array(N, dtype=numpy.float64)
     for n_order, order in enumerate(orders):
         pyplot.scatter(N, errs[n_order], label=r"WENO, $r={}$".format(order))
-    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**2,
-             color="k", label=r"$\mathcal{O}(\Delta x^2)$")
+    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
+                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
 
     ax = pyplot.gca()
     ax.set_xscale('log')
@@ -193,5 +189,6 @@ if __name__ == "__main__":
                fontsize=16)
 
     pyplot.legend(frameon=False)
-    pyplot.show()
+    pyplot.savefig("weno-converge.pdf")
+    #pyplot.show()
     
