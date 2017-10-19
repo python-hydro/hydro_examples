@@ -13,6 +13,15 @@ from scipy import linalg
 import matplotlib.pyplot as plt
 from diffusion_explicit import Grid1d
 
+import matplotlib as mpl
+
+# Use LaTeX for rendering
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+mpl.rcParams['font.size'] = 12
+mpl.rcParams['legend.fontsize'] = 'large'
+mpl.rcParams['figure.titlesize'] = 'small'
+
 class Simulation(object):
 
     def __init__(self, grid, k=1.0):
@@ -132,57 +141,46 @@ if __name__ == "__main__":
 
     k = 1.0
 
-    N = [32, 64, 128, 256, 512]
+    N = np.array([32, 64, 128, 256, 512])
 
     # CFL number
-    C = 0.8
+    CFL = [0.8, 8.0]
 
-    err = []
+    for C in CFL:
+        err = []
 
-    for nx in N:
+        for nx in N:
 
-        # the present C-N discretization
-        g = Grid1d(nx, ng=1)
-        s = Simulation(g, k=k)
-        s.init_cond("gaussian", t0, phi1, phi2)
-        s.evolve(C, tmax)
+            # the present C-N discretization
+            print(C, nx)
+            g = Grid1d(nx, ng=1)
+            s = Simulation(g, k=k)
+            s.init_cond("gaussian", t0, phi1, phi2)
+            s.evolve(C, tmax)
         
-        xc = 0.5*(g.xmin + g.xmax)
-        phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
+            xc = 0.5*(g.xmin + g.xmax)
+            phi_analytic = g.phi_a(tmax, k, t0, phi1, phi2)
+            
+            err.append(g.norm(g.phi - phi_analytic))
 
-        err.append(g.norm(g.phi - phi_analytic))
+        plt.clf()
 
-        # plt.clf()
-        # plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1], color="0.5")
-        # plt.scatter(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1], color="r", marker="x")
+        err = np.array(err)
 
-        # plt.xlim(g.xmin, g.xmax)
-        # plt.title("N = {}".format(nx))
-        # plt.xlabel("x")
-        # plt.ylabel(r"$\phi$")
+        plt.scatter(N, err, color="C0", label="C-N implicit diffusion")
+        plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
+                   color="C1", label="$\mathcal{O}(\Delta x^2)$")
 
-        # plt.savefig("phi-implicit-N{}.png".format(nx))
+        plt.xlabel(r"$N$", fontsize="large")
+        plt.ylabel(r"L2 norm of absolute error")
+        plt.title("C-N Implicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
 
+        plt.ylim(1.e-6, 1.e-2)
+        plt.legend(frameon=False, fontsize="small")
 
-    plt.clf()
-
-    N = np.array(N, dtype=np.float64)
-    err = np.array(err)
-
-    plt.scatter(N, err, color="r", label="C-N implicit diffusion")
-    plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, 
-               color="k", label="$\mathcal{O}(\Delta x^2)$")
-
-    plt.xlabel(r"$N$", fontsize="large")
-    plt.ylabel(r"L2 norm of absolute error")
-    plt.title("Convergence of C-N Implicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
-
-    plt.ylim(1.e-6, 1.e-2)
-    plt.legend(frameon=False, fontsize="small")
-
-    plt.tight_layout()
-
-    plt.savefig("diffimplicit-converge-{}.pdf".format(C))
+        plt.tight_layout()
+        
+        plt.savefig("diffimplicit-converge-{}.pdf".format(C))
 
 
     #-------------------------------------------------------------------------
@@ -216,7 +214,7 @@ if __name__ == "__main__":
         ntimes = 5
         tend = tmax/2.0**(ntimes-1)
 
-        c = ["0.5", "r", "g", "b", "k"]
+        c = ["C0", "C1", "C2", "C3", "C4"]
 
         while tend <= tmax:
 
@@ -233,7 +231,7 @@ if __name__ == "__main__":
             plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
                      "x", color=color, label="$t = %g$ s" % (tend))
             plt.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1],
-                     color=color, ls=":")
+                     color=color, ls="-")
 
             tend = 2.0*tend
 
@@ -272,7 +270,7 @@ if __name__ == "__main__":
     plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
              color="r", marker="x", ls="-", label="$t = %g$ s" % (tend))
     plt.plot(ga.x[ga.ilo:ga.ihi+1], phi_analytic[ga.ilo:ga.ihi+1],
-             color=color, ls=":")
+             color=color, ls="-")
 
     plt.xlim(0.2,0.8)
 

@@ -13,6 +13,15 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 
+import matplotlib as mpl
+
+# Use LaTeX for rendering
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+mpl.rcParams['font.size'] = 12
+mpl.rcParams['legend.fontsize'] = 'medium'
+mpl.rcParams['figure.titlesize'] = 'small'
+
 class Grid1d(object):
 
     def __init__(self, nx, ng=1, xmin=0.0, xmax=1.0):
@@ -126,7 +135,7 @@ if __name__ == "__main__":
     ntimes = 4
     tend = tmax/10.0**ntimes
 
-    c = ["0.5", "r", "g", "b", "k"]
+    c = ["C0", "C1", "C2", "C3", "C4"]
 
     while tend <= tmax:
 
@@ -151,7 +160,7 @@ if __name__ == "__main__":
 
     plt.xlabel("$x$", fontsize="large")
     plt.ylabel(r"$\phi$", fontsize="large")
-    plt.title("explicit diffusion, nx = {}, C = {:3.2f}".format(nx, C))
+    plt.title("explicit diffusion, nx = {}, C = {:3.2f}".format(nx, C), fontsize="small")
 
     plt.savefig("diff-explicit-{}.pdf".format(nx))
 
@@ -193,7 +202,7 @@ if __name__ == "__main__":
     plt.legend(frameon=False)
     plt.xlabel("$x$", fontsize="large")
     plt.ylabel(r"$\phi$", fontsize="large")
-    plt.title("Explicit diffusion with varying resolution, C = {:3.2f}, t = {:5.2g}".format(C, tmax))
+    plt.title("Explicit diffusion, C = {:3.2f}, t = {:5.2g}".format(C, tmax), fontsize="small")
 
     plt.savefig("diffexplicit-res.pdf")
 
@@ -202,15 +211,15 @@ if __name__ == "__main__":
     N = np.array(N, dtype=np.float64)
     err = np.array(err)
 
-    plt.scatter(N, err, color="r", label="explicit diffusion")
-    plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="k", label="$\mathcal{O}(\Delta x^2)$")
+    plt.scatter(N, err, color="C1", label="explicit diffusion")
+    plt.loglog(N, err[len(N)-1]*(N[len(N)-1]/N)**2, color="C0", label="$\mathcal{O}(\Delta x^2)$")
 
     plt.xlabel(r"$N$", fontsize="large")
     plt.ylabel(r"L2 norm of absolute error")
-    plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax))
+    plt.title("Convergence of Explicit Diffusion, C = %3.2f, t = %5.2g" % (C, tmax), fontsize="small")
 
     plt.ylim(1.e-6, 1.e-1)
-    plt.legend(frameon=False)
+    plt.legend(frameon=False, fontsize="small")
 
     plt.savefig("diffexplicit-converge-{}.pdf".format(C))
 
@@ -235,14 +244,14 @@ if __name__ == "__main__":
     phi_analytic = g.phi_a(tend, k, t0, phi1, phi2)
 
     plt.plot(g.x[g.ilo:g.ihi+1], g.phi[g.ilo:g.ihi+1],
-             "x-", color="r", label="$t = %g$ s" % (tend))
+             "x-", color="C0", label="$t = %g$ s" % (tend))
     plt.plot(g.x[g.ilo:g.ihi+1], phi_analytic[g.ilo:g.ihi+1],
              color="0.5", ls=":")
 
     plt.xlim(0.35,0.65)
     plt.xlabel("$x$", fontsize="large")
     plt.ylabel(r"$\phi$", fontsize="large")
-    plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax))
+    plt.title("explicit diffusion, nx = %d, C = %3.2f, t = %5.2g" % (nx, C, tmax), fontsize="small")
 
     ax = plt.gca()
     ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))

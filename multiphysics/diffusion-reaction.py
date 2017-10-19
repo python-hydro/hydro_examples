@@ -280,7 +280,7 @@ plt.plot(x, phi0, ls=":", color="0.9", zorder=-1)
 
 plt.xlabel("$x$")
 plt.ylabel("$\phi$")
-plt.title(r"Diffusion-Reaction, $N = {}, \, \kappa = {:3.2f}, \, \tau = {:3.2f}$".format(nx, kappa, tau, dt))
+#plt.title(r"Diffusion-Reaction, $N = {}, \, \kappa = {:3.2f}, \, \tau = {:3.2f}$".format(nx, kappa, tau, dt))
 #, \, \delta t = {:3.2f}$ (between lines)
 plt.tight_layout()
 
