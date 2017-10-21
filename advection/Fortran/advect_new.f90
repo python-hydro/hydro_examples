@@ -310,16 +310,20 @@ subroutine fillBC(a)
 
   type (gridvar_t), intent(inout) :: a
 
-  integer :: i
+  integer :: i, ilo, ihi, ng
 
+  ilo = a % gd % ilo
+  ihi = a % gd % ihi
+  ng = a % gd % ng
+  
   ! left boundary
-  do i = a % gd % ilo - a % gd % ng, a % gd % ilo - 1
-     a % d(i) = a % d(a % gd % ihi - a % gd % ng + i)
+  do i = 1, ng
+     a % d(ilo - i) = a % d(ihi + 1 - i)
   enddo
 
   ! right boundary
-  do i = a % gd % ihi + 1, a % gd % ihi + a % gd % ng
-     a % d(i) = a % d(i - a % gd % ihi + a % gd % ng)
+  do i = 1, ng
+     a % d(ihi + i) = a % d(ilo - 1 + i)
   enddo
 
   return
