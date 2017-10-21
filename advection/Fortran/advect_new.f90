@@ -124,7 +124,7 @@ program advect
   integer, parameter :: inittype = 2
 
   ! slope type (1=godunov, 2=plm, 3=ppm)
-  integer, parameter :: islopetype = 3
+  integer, parameter :: islopetype = 2
 
   integer, parameter :: plmlimiter = 1
 
