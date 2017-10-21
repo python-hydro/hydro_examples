@@ -141,8 +141,8 @@ class Simulation(object):
         #     ^       i       ^ ^        i+1
         #     ur(i)     ul(i+1) ur(i+1)
         #
-        ur[ib:ie+1] = u[ib:ie+1] - \
-                      0.5*(1.0 + u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1]
+        ur[ib:ie+2] = u[ib:ie+2] - \
+                      0.5*(1.0 + u[ib:ie+2]*dt/self.grid.dx)*ldeltau[ib:ie+2]
 
         ul[ib+1:ie+2] = u[ib:ie+1] + \
                         0.5*(1.0 - u[ib:ie+1]*dt/self.grid.dx)*ldeltau[ib:ie+1]

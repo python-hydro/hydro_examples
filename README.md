@@ -75,7 +75,12 @@ https://github.com/zingale/pyro2
   - `conservative-interpolation.ipynb`: an IPython notebook that
     illustrates how to derive high-order conservative interpolants
 	for finite-volume data.
-  
+
+* `incompressible/`
+
+  - `project.py`: a simple example of using a projection to recover
+    a divergence-free velocity field.
+
 * `multigrid/`
 
   - `mg_converge.py`: a convergence test of the multigrid solver. A
