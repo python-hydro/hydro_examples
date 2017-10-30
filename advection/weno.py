@@ -47,6 +47,52 @@ def weno(order, q):
     return qL
 
 
+def weno_M(order, q):
+    """
+    Do WENOM reconstruction following Gerolymos equation (18)
+    
+    Parameters
+    ----------
+    
+    order : int
+        The stencil width
+    q : numpy array
+        Scalar data to reconstruct
+        
+    Returns
+    -------
+    
+    qL : numpy array
+        Reconstructed data - boundary points are zero
+    """
+    C = weno_coefficients.C_all[order]
+    a = weno_coefficients.a_all[order]
+    sigma = weno_coefficients.sigma_all[order]
+
+    qL = numpy.zeros_like(q)
+    beta = numpy.zeros((order, len(q)))
+    w = numpy.zeros_like(beta)
+    np = len(q) - 2 * order
+    epsilon = 1e-16
+    for i in range(order, np+order):
+        q_stencils = numpy.zeros(order)
+        alpha_JS = numpy.zeros(order)
+        for k in range(order):
+            for l in range(order):
+                for m in range(l+1):
+                    beta[k, i] += sigma[k, l, m] * q[i+k-l] * q[i+k-m]
+            alpha_JS[k] = C[k] / (epsilon + beta[k, i]**2)
+            for l in range(order):
+                q_stencils[k] += a[k, l] * q[i+k-l]
+        w_JS = alpha_JS / numpy.sum(alpha_JS)
+        alpha = w_JS * (C + C**2 - 3 * C * w_JS + w_JS**2) / \
+                       (C**2 + w_JS * (1 - 2 * C))
+        w[:, i] = alpha / numpy.sum(alpha)
+        qL[i] = numpy.dot(w[:, i], q_stencils)
+    
+    return qL
+
+
 class WENOSimulation(advection.Simulation):
     
     def __init__(self, grid, u, C=0.8, weno_order=3):
@@ -55,6 +101,23 @@ class WENOSimulation(advection.Simulation):
         self.u = u   # the constant advective velocity
         self.C = C   # CFL number
         self.weno_order = weno_order
+
+
+    def init_cond(self, type="tophat"):
+        """ initialize the data """
+        if type == "tophat":
+            self.grid.a[:] = 0.0
+            self.grid.a[numpy.logical_and(self.grid.x >= 0.333,
+                                       self.grid.x <= 0.666)] = 1.0
+
+        elif type == "sine":
+            self.grid.a[:] = numpy.sin(2.0*numpy.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
+
+        elif type == "gaussian":
+            self.grid.a[:] = 1.0 + numpy.exp(-60.0*(self.grid.x - 0.5)**2)
+        elif type == "sine_sine":
+            self.grid.a[:] = numpy.sin(numpy.pi*self.grid.x - 
+                       numpy.sin(numpy.pi*self.grid.x) / numpy.pi)
 
 
     def states(self):
@@ -114,6 +177,19 @@ class WENOSimulation(advection.Simulation):
             self.t += dt
 
 
+class WENOMSimulation(WENOSimulation):
+
+    def states(self):
+        
+        g = self.grid
+        al = g.scratch_array()
+        ar = g.scratch_array()
+        
+        al = weno_M(self.weno_order, g.a)
+        ar[::-1] = weno_M(self.weno_order, g.a[::-1])
+        return al, ar
+
+
 if __name__ == "__main__":
 
 
@@ -146,41 +222,77 @@ if __name__ == "__main__":
     
     #-------------------------------------------------------------------------
     # convergence test
-    problem = "gaussian"
+    # Note that WENO schemes with standard weights lose convergence at
+    # critical points. For high degree critical points they lose more orders.
+    # The suggestion in Gerolymos is that you may expect to drop down to
+    # order r-1 in the limit.
+    # The Gaussian has all odd derivatives vanishing at the origin, so
+    # the higher order schemes will lose accuracy.
+    # For the Gaussian:
+    # This shows clean 5th order convergence for r=3
+    # But for r=4-6 the best you get is ~6th order, and 5th order is more
+    # realistic
+    # For sin(x - sin(x)) type data Gerolymos expects better results
+    problem = "sine_sine"
 
-    xmin = 0.0
+    xmin =-1.0
     xmax = 1.0
-    orders = [2, 3, 4]
-    N = [32, 64, 128, 256, 512]
- #   N = [32, 64, 128]
+    orders = [4]
+#    orders = [3, 4, 5, 6]
+    N1 = [2**4*(3/2)**i for i in range(5)]
+    N2 = [2**5*(3/2)**i for i in range(6)]
+    N3 = [3**4*(4/3)**i for i in range(5)]
+    N4 = [2**(4+i) for i in range(4)]
+    N = numpy.unique(numpy.array(N1+N2+N3+N4, dtype=numpy.int))
+    N.sort()
+#    N = [32, 64, 128, 256, 512]
+#    N = [32, 64, 128]
 
     errs = []
+    errsM = []
 
     u = 1.0
+
+    colors="bygrc"
 
     for order in orders:
         ng = order+1
         errs.append([])
+        errsM.append([])
         for nx in N:
             print(order, nx)
             gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
             su = WENOSimulation(gu, u, C=0.5, weno_order=order)
+            guM = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+            suM = WENOMSimulation(guM, u, C=0.5, weno_order=order)
         
-            su.init_cond("gaussian")
+            su.init_cond("sine_sine")
+            suM.init_cond("sine_sine")
             ainit = su.grid.a.copy()
         
-            su.evolve(num_periods=1)
+            su.evolve(num_periods=5)
+            suM.evolve(num_periods=5)
         
             errs[-1].append(gu.norm(gu.a - ainit))
+            errsM[-1].append(guM.norm(guM.a - ainit))
     
     pyplot.clf()
     N = numpy.array(N, dtype=numpy.float64)
     for n_order, order in enumerate(orders):
-        pyplot.scatter(N, errs[n_order], label=r"WENO, $r={}$".format(order))
+        pyplot.scatter(N, errs[n_order],
+                       color=colors[n_order],
+                       label=r"WENO, $r={}$".format(order))
+        pyplot.scatter(N, errsM[n_order],
+                       color=colors[n_order],
+                       label=r"WENOM, $r={}$".format(order))
+        pyplot.plot(N, errs[n_order][4]*(N[4]/N)**(2*order-1),
+                    linestyle="--", color=colors[n_order],
+                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-1))
     pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
                 color="k", label=r"$\mathcal{O}(\Delta x^4)$")
 
     ax = pyplot.gca()
+    ax.set_ylim(numpy.min(errs)/5, numpy.max(errs)*5)
     ax.set_xscale('log')
     ax.set_yscale('log')
 
