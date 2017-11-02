@@ -2,6 +2,7 @@ import numpy
 from matplotlib import pyplot
 import advection
 import weno_coefficients
+from scipy.integrate import ode
 
 
 def weno(order, q):
@@ -177,6 +178,35 @@ class WENOSimulation(advection.Simulation):
             self.t += dt
 
 
+    def evolve_scipy(self, num_periods=1):
+        """ evolve the linear advection equation using RK4 """
+        self.t = 0.0
+        g = self.grid
+        
+        def rk_substep_scipy(t, y):
+            # Periodic BCs
+            y[:g.ng] = y[-2*g.ng:-g.ng]
+            y[-g.ng:] = y[g.ng:2*g.ng]
+            al = g.scratch_array()
+            ar = g.scratch_array()
+            al[:] = weno(self.weno_order, y)
+            ar[::-1] = weno(self.weno_order, y[::-1])
+            flux = self.riemann(al, ar)
+            rhs = g.scratch_array()
+            rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo-1:g.ihi] - flux[g.ilo:g.ihi+1])
+            return rhs
+
+        tmax = num_periods*self.period()
+        r = ode(rk_substep_scipy).set_integrator('dop853')
+        r.set_initial_value(g.a, 0)
+        dt = self.timestep()
+
+        # main evolution loop
+        while r.successful() and r.t < tmax:
+            r.integrate(r.t+dt)
+        g.a[:] = r.y
+
+
 class WENOMSimulation(WENOSimulation):
 
     def states(self):
@@ -220,33 +250,161 @@ if __name__ == "__main__":
              label="WENO3")
     
     
-    #-------------------------------------------------------------------------
-    # convergence test
-    # Note that WENO schemes with standard weights lose convergence at
-    # critical points. For high degree critical points they lose more orders.
-    # The suggestion in Gerolymos is that you may expect to drop down to
-    # order r-1 in the limit.
-    # The Gaussian has all odd derivatives vanishing at the origin, so
-    # the higher order schemes will lose accuracy.
-    # For the Gaussian:
-    # This shows clean 5th order convergence for r=3
-    # But for r=4-6 the best you get is ~6th order, and 5th order is more
-    # realistic
-    # For sin(x - sin(x)) type data Gerolymos expects better results
-    problem = "sine_sine"
-
-    xmin =-1.0
-    xmax = 1.0
-    orders = [4]
+#    #-------------------------------------------------------------------------
+#    # convergence test
+#    # Note that WENO schemes with standard weights lose convergence at
+#    # critical points. For high degree critical points they lose more orders.
+#    # The suggestion in Gerolymos is that you may expect to drop down to
+#    # order r-1 in the limit.
+#    # The Gaussian has all odd derivatives vanishing at the origin, so
+#    # the higher order schemes will lose accuracy.
+#    # For the Gaussian:
+#    # This shows clean 5th order convergence for r=3
+#    # But for r=4-6 the best you get is ~6th order, and 5th order is more
+#    # realistic
+#    # For sin(x - sin(x)) type data Gerolymos expects better results
+#    # But the problem actually appears to be the time integrator
+#    # Switching to Dormand-Price 8th order from scipy (a hack) will make it
+#    # work for all cases. With sin(.. sin) data you get 2r - 2 thanks to
+#    # the one critical point.
+#    
+#    problem = "sine_sine"
+#
+#    xmin =-1.0
+#    xmax = 1.0
+##    orders = [4]
 #    orders = [3, 4, 5, 6]
-    N1 = [2**4*(3/2)**i for i in range(5)]
-    N2 = [2**5*(3/2)**i for i in range(6)]
-    N3 = [3**4*(4/3)**i for i in range(5)]
-    N4 = [2**(4+i) for i in range(4)]
-    N = numpy.unique(numpy.array(N1+N2+N3+N4, dtype=numpy.int))
-    N.sort()
-#    N = [32, 64, 128, 256, 512]
-#    N = [32, 64, 128]
+##    N1 = [2**4*3**i//2**i for i in range(5)]
+##    N2 = [2**5*3**i//2**i for i in range(6)]
+##    N3 = [3**4*4**i//3**i for i in range(5)]
+##    N4 = [2**(4+i) for i in range(4)]
+##    N = numpy.unique(numpy.array(N1+N2+N3+N4, dtype=numpy.int))
+##    N.sort()
+##    N = [32, 64, 128, 256, 512]
+##    N = [32, 64, 128]
+#    N = [24, 32, 54, 64, 81, 108, 128]
+#
+#    errs = []
+#    errsM = []
+#
+#    u = 1.0
+#
+#    colors="bygrc"
+#
+#    for order in orders:
+#        ng = order+1
+#        errs.append([])
+#        errsM.append([])
+#        for nx in N:
+#            print(order, nx)
+#            gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+#            su = WENOSimulation(gu, u, C=0.5, weno_order=order)
+##            guM = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+##            suM = WENOMSimulation(guM, u, C=0.5, weno_order=order)
+#        
+#            su.init_cond("sine_sine")
+##            suM.init_cond("sine_sine")
+#            ainit = su.grid.a.copy()
+#        
+#            su.evolve_scipy(num_periods=1)
+##            suM.evolve_scipy(num_periods=1)
+#        
+#            errs[-1].append(gu.norm(gu.a - ainit))
+##            errsM[-1].append(guM.norm(guM.a - ainit))
+#    
+#    pyplot.clf()
+#    N = numpy.array(N, dtype=numpy.float64)
+#    for n_order, order in enumerate(orders):
+#        pyplot.scatter(N, errs[n_order],
+#                       color=colors[n_order],
+#                       label=r"WENO, $r={}$".format(order))
+##        pyplot.scatter(N, errsM[n_order],
+##                       color=colors[n_order],
+##                       label=r"WENOM, $r={}$".format(order))
+#        pyplot.plot(N, errs[n_order][0]*(N[0]/N)**(2*order-2),
+#                    linestyle="--", color=colors[n_order],
+#                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-2))
+##    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
+##                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
+#
+#    ax = pyplot.gca()
+#    ax.set_ylim(numpy.min(errs)/5, numpy.max(errs)*5)
+#    ax.set_xscale('log')
+#    ax.set_yscale('log')
+#
+#    pyplot.xlabel("N")
+#    pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
+#               fontsize=16)
+#
+#    pyplot.legend(frameon=False)
+#    pyplot.savefig("weno-converge-sine-sine.pdf")
+##    pyplot.show()
+    
+#-------------- RK4    
+    
+    problem = "gaussian"
+
+    xmin = 0.0
+    xmax = 1.0
+    orders = [3, 5]
+    N = [54, 64, 81, 108, 128]
+
+    errs = []
+
+    u = 1.0
+
+    colors="brc"
+
+    for order in orders:
+        ng = order+1
+        errs.append([])
+        for nx in N:
+            print(order, nx)
+            gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+            su = WENOSimulation(gu, u, C=0.5, weno_order=order)
+        
+            su.init_cond("gaussian")
+            ainit = su.grid.a.copy()
+        
+            su.evolve(num_periods=5)
+        
+            errs[-1].append(gu.norm(gu.a - ainit))
+    
+    pyplot.clf()
+    N = numpy.array(N, dtype=numpy.float64)
+    for n_order, order in enumerate(orders):
+        pyplot.scatter(N, errs[n_order],
+                       color=colors[n_order],
+                       label=r"WENO, $r={}$".format(order))
+    pyplot.plot(N, errs[0][-1]*(N[-1]/N)**(5),
+                linestyle="--", color=colors[0],
+                label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(5))
+    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
+                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
+
+    ax = pyplot.gca()
+    ax.set_ylim(numpy.min(errs)/5, numpy.max(errs)*5)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    pyplot.xlabel("N")
+    pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
+               fontsize=16)
+    pyplot.title("Convergence of Gaussian, RK4")
+
+    pyplot.legend(frameon=False)
+    pyplot.savefig("weno-converge-gaussian-rk4.pdf")
+#    pyplot.show()
+    
+#-------------- Gaussian    
+    
+    problem = "gaussian"
+
+    xmin = 0.0
+    xmax = 1.0
+    orders = [3, 4, 5, 6]
+    N = [24, 32, 54, 64, 81, 108, 128]
+#    N = [32, 64, 108, 128]
 
     errs = []
     errsM = []
@@ -263,18 +421,18 @@ if __name__ == "__main__":
             print(order, nx)
             gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
             su = WENOSimulation(gu, u, C=0.5, weno_order=order)
-            guM = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
-            suM = WENOMSimulation(guM, u, C=0.5, weno_order=order)
+#            guM = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+#            suM = WENOMSimulation(guM, u, C=0.5, weno_order=order)
         
-            su.init_cond("sine_sine")
-            suM.init_cond("sine_sine")
+            su.init_cond("gaussian")
+#            suM.init_cond("gaussian")
             ainit = su.grid.a.copy()
         
-            su.evolve(num_periods=5)
-            suM.evolve(num_periods=5)
+            su.evolve_scipy(num_periods=1)
+#            suM.evolve_scipy(num_periods=1)
         
             errs[-1].append(gu.norm(gu.a - ainit))
-            errsM[-1].append(guM.norm(guM.a - ainit))
+#            errsM[-1].append(guM.norm(guM.a - ainit))
     
     pyplot.clf()
     N = numpy.array(N, dtype=numpy.float64)
@@ -282,14 +440,14 @@ if __name__ == "__main__":
         pyplot.scatter(N, errs[n_order],
                        color=colors[n_order],
                        label=r"WENO, $r={}$".format(order))
-        pyplot.scatter(N, errsM[n_order],
-                       color=colors[n_order],
-                       label=r"WENOM, $r={}$".format(order))
-        pyplot.plot(N, errs[n_order][4]*(N[4]/N)**(2*order-1),
+#        pyplot.scatter(N, errsM[n_order],
+#                       color=colors[n_order],
+#                       label=r"WENOM, $r={}$".format(order))
+        pyplot.plot(N, errs[n_order][0]*(N[0]/N)**(2*order-2),
                     linestyle="--", color=colors[n_order],
-                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-1))
-    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
-                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
+                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-2))
+#    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
+#                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
 
     ax = pyplot.gca()
     ax.set_ylim(numpy.min(errs)/5, numpy.max(errs)*5)
@@ -299,8 +457,9 @@ if __name__ == "__main__":
     pyplot.xlabel("N")
     pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                fontsize=16)
+    pyplot.title("Convergence of Gaussian, DOPRK8")
 
     pyplot.legend(frameon=False)
-    pyplot.savefig("weno-converge.pdf")
-    #pyplot.show()
+    pyplot.savefig("weno-converge-gaussian.pdf")
+#    pyplot.show()
     
