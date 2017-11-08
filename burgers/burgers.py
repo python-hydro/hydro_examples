@@ -70,6 +70,14 @@ class Grid1d(object):
             sys.exit("invalid BC")
 
 
+    def norm(self, e):
+        """ return the norm of quantity e which lives on the grid """
+        if len(e) != 2*self.ng + self.nx:
+            return None
+
+        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+
+
 class Simulation(object):
 
     def __init__(self, grid):
