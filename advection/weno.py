@@ -106,41 +106,29 @@ class WENOSimulation(advection.Simulation):
 
     def init_cond(self, type="tophat"):
         """ initialize the data """
-        if type == "tophat":
-            self.grid.a[:] = 0.0
-            self.grid.a[numpy.logical_and(self.grid.x >= 0.333,
-                                       self.grid.x <= 0.666)] = 1.0
-
-        elif type == "sine":
-            self.grid.a[:] = numpy.sin(2.0*numpy.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
-
-        elif type == "gaussian":
-            self.grid.a[:] = 1.0 + numpy.exp(-60.0*(self.grid.x - 0.5)**2)
-        elif type == "sine_sine":
+        if type == "sine_sine":
             self.grid.a[:] = numpy.sin(numpy.pi*self.grid.x - 
                        numpy.sin(numpy.pi*self.grid.x) / numpy.pi)
-
-
-    def states(self):
-        
-        g = self.grid
-        al = g.scratch_array()
-        ar = g.scratch_array()
-        
-        al = weno(self.weno_order, g.a)
-        ar[::-1] = weno(self.weno_order, g.a[::-1])
-        return al, ar
+        else:
+            super().init_cond(type)
 
 
     def rk_substep(self):
         
         g = self.grid
         g.fill_BCs()
-        al, ar = self.states()
-        flux = self.riemann(al, ar)
+        f = self.u * g.a
+        alpha = abs(self.u)
+        fp = (f + alpha * g.a) / 2
+        fm = (f - alpha * g.a) / 2
+        fpr = g.scratch_array()
+        fml = g.scratch_array()
+        flux = g.scratch_array()
+        fpr[1:] = weno(self.weno_order, fp[:-1])
+        fml[-1::-1] = weno(self.weno_order, fm[-1::-1])
+        flux[1:-1] = fpr[1:-1] + fml[1:-1]
         rhs = g.scratch_array()
-        rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo-1:g.ihi] - flux[g.ilo:g.ihi+1])
- #       rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo:g.ihi+1] - flux[g.ilo+1:g.ihi+2])
+        rhs[1:-1] = 1/g.dx * (flux[1:-1] - flux[2:])
         return rhs
 
 
@@ -187,13 +175,18 @@ class WENOSimulation(advection.Simulation):
             # Periodic BCs
             y[:g.ng] = y[-2*g.ng:-g.ng]
             y[-g.ng:] = y[g.ng:2*g.ng]
-            al = g.scratch_array()
-            ar = g.scratch_array()
-            al[:] = weno(self.weno_order, y)
-            ar[::-1] = weno(self.weno_order, y[::-1])
-            flux = self.riemann(al, ar)
+            f = self.u * y
+            alpha = abs(self.u)
+            fp = (f + alpha * y) / 2
+            fm = (f - alpha * y) / 2
+            fpr = g.scratch_array()
+            fml = g.scratch_array()
+            flux = g.scratch_array()
+            fpr[1:] = weno(self.weno_order, fp[:-1])
+            fml[-1::-1] = weno(self.weno_order, fm[-1::-1])
+            flux[1:-1] = fpr[1:-1] + fml[1:-1]
             rhs = g.scratch_array()
-            rhs[g.ilo:g.ihi+1] = 1/g.dx * (flux[g.ilo-1:g.ihi] - flux[g.ilo:g.ihi+1])
+            rhs[1:-1] = 1/g.dx * (flux[1:-1] - flux[2:])
             return rhs
 
         tmax = num_periods*self.period()
@@ -209,16 +202,58 @@ class WENOSimulation(advection.Simulation):
 
 class WENOMSimulation(WENOSimulation):
 
-    def states(self):
+    def rk_substep(self):
         
         g = self.grid
-        al = g.scratch_array()
-        ar = g.scratch_array()
+        g.fill_BCs()
+        f = self.u * g.a
+        alpha = abs(self.u)
+        fp = (f + alpha * g.a) / 2
+        fm = (f - alpha * g.a) / 2
+        fpr = g.scratch_array()
+        fml = g.scratch_array()
+        flux = g.scratch_array()
+        fpr[1:] = weno_M(self.weno_order, fp[:-1])
+        fml[-1::-1] = weno_M(self.weno_order, fm[-1::-1])
+        flux[1:-1] = fpr[1:-1] + fml[1:-1]
+        rhs = g.scratch_array()
+        rhs[1:-1] = 1/g.dx * (flux[1:-1] - flux[2:])
+        return rhs
+    
+    
+    def evolve_scipy(self, num_periods=1):
+        """ evolve the linear advection equation using scipy """
+        self.t = 0.0
+        g = self.grid
         
-        al = weno_M(self.weno_order, g.a)
-        ar[::-1] = weno_M(self.weno_order, g.a[::-1])
-        return al, ar
+        def rk_substep_scipy(t, y):
+            # Periodic BCs
+            y[:g.ng] = y[-2*g.ng:-g.ng]
+            y[-g.ng:] = y[g.ng:2*g.ng]
+            f = self.u * y
+            alpha = abs(self.u)
+            fp = (f + alpha * y) / 2
+            fm = (f - alpha * y) / 2
+            fpr = g.scratch_array()
+            fml = g.scratch_array()
+            flux = g.scratch_array()
+            fpr[1:] = weno_M(self.weno_order, fp[:-1])
+            fml[-1::-1] = weno_M(self.weno_order, fm[-1::-1])
+            flux[1:-1] = fpr[1:-1] + fml[1:-1]
+            rhs = g.scratch_array()
+            rhs[1:-1] = 1/g.dx * (flux[1:-1] - flux[2:])
+            return rhs
 
+        tmax = num_periods*self.period()
+        r = ode(rk_substep_scipy).set_integrator('dop853')
+        r.set_initial_value(g.a, 0)
+        dt = self.timestep()
+
+        # main evolution loop
+        while r.successful() and r.t < tmax:
+            r.integrate(r.t+dt)
+        g.a[:] = r.y
+    
 
 if __name__ == "__main__":
 
