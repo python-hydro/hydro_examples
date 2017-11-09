@@ -150,13 +150,18 @@ class WENOSimulation(object):
             self.grid.q[1, :] = S[:]
             self.grid.q[2, :] = E[:]
 
-    def timestep(self):
+
+    def max_lambda(self):
         rho = self.grid.q[0]
         v = self.grid.q[1] / rho
         p = (self.eos_gamma - 1) * (self.grid.q[2, :] - rho * v**2 / 2)
         cs = numpy.sqrt(self.eos_gamma * p / rho)
-        max_lambda = max(numpy.abs(v) + cs)
-        return self.C * self.grid.dx / max_lambda
+        return max(numpy.abs(v) + cs)
+
+
+    def timestep(self):
+        return self.C * self.grid.dx / self.max_lambda()
+
 
     def euler_flux(self, q):
         flux = numpy.zeros_like(q)
@@ -176,7 +181,7 @@ class WENOSimulation(object):
         g = self.grid
         g.fill_BCs()
         f = self.euler_flux(g.q)
-        alpha = numpy.max(abs(g.q))
+        alpha = self.max_lambda()
         fp = (f + alpha * g.q) / 2
         fm = (f - alpha * g.q) / 2
         fpr = g.scratch_array()
@@ -284,6 +289,63 @@ if __name__ == "__main__":
         pyplot.show()
 
 
+#    # setup the problem -- double rarefaction
+#    left = riemann.State(p=0.4, u=-2.0, rho=1.0)
+#    right = riemann.State(p=0.4, u=2.0, rho=1.0)
+#
+#    rp = riemann.RiemannProblem(left, right)
+#    rp.find_star_state()
+#
+#    x_e, rho_e, v_e, p_e = rp.sample_solution(0.1, 1024)
+#    e_e = p_e / 0.4 / rho_e
+#    
+#    #-----------------------------------------------------------------------------
+#    # Sod
+#    
+#    xmin = -0.5
+#    xmax = 0.5
+#    nx = 64
+#    
+#    tmax = 0.1
+#    C = 0.5
+#    
+#    for order in range(3, 7):
+#    
+#        ng = order+1
+#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
+#        
+#        pyplot.clf()
+#        
+#        s = WENOSimulation(g, C, order)
+#        s.init_cond("double rarefaction")
+#        s.evolve(tmax)
+#        g = s.grid
+#        x = g.x + 0.5
+#        rho = g.q[0, :]
+#        v = g.q[1, :] / g.q[0, :]
+#        e = (g.q[2, :] - rho * v**2 / 2) / rho
+#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
+#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
+#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
+#        axes[0].plot(x_e, rho_e, 'k--')
+#        axes[0].set_ylabel(r"$\rho$")
+#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
+#        axes[1].plot(x_e, v_e, 'k--')
+#        axes[1].set_ylabel(r"$u$")
+#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
+#        axes[2].plot(x_e, p_e, 'k--')
+#        axes[2].set_xlabel(r"$x$")
+#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
+#        axes[3].plot(x_e, e_e, 'k--')
+#        axes[3].set_xlabel(r"$x$")
+#        axes[3].set_ylabel(r"$e$")
+#        for ax in axes:
+#            ax.set_xlim(0, 1)
+#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
+#        fig.tight_layout()
+#        pyplot.show()
+
+
     # Advection
     # There seems to be an odd instability kicking in after t=1
     # Vacuum formation?
@@ -294,7 +356,7 @@ if __name__ == "__main__":
     
     xmin = 0
     xmax = 1
-    nx = 128
+    nx = 64
     
     tmax = 1
     C = 0.5
