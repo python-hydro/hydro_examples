@@ -113,21 +113,22 @@ class Simulation(object):
     def states(self, dt):
         """ compute the left and right interface states """
 
+        g = self.grid
         # compute the piecewise linear slopes -- 2nd order MC limiter
         # we pick a range of cells that includes 1 ghost cell on either
         # side
-        ib = self.grid.ilo-1
-        ie = self.grid.ihi+1
+        ib = g.ilo-1
+        ie = g.ihi+1
 
-        u = self.grid.u
+        u = g.u
 
         # this is the MC limiter from van Leer (1977), as given in
         # LeVeque (2002).  Note that this is slightly different than
         # the expression from Colella (1990)
 
-        dc = self.grid.scratch_array()
-        dl = self.grid.scratch_array()
-        dr = self.grid.scratch_array()
+        dc = g.scratch_array()
+        dl = g.scratch_array()
+        dr = g.scratch_array()
 
         dc[ib:ie+1] = 0.5*(u[ib+1:ie+2] - u[ib-1:ie  ])
         dl[ib:ie+1] = u[ib+1:ie+2] - u[ib  :ie+1]
@@ -193,6 +194,8 @@ class Simulation(object):
 
         self.t = 0.0
 
+        g = self.grid
+        
         # main evolution loop
         while (self.t < tmax):
 

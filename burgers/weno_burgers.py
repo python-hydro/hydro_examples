@@ -131,7 +131,7 @@ class WENOSimulation(burgers.Simulation):
         elif type == "gaussian":
             self.grid.u = 1.0 + numpy.exp(-60.0*(self.grid.x - 0.5)**2)
         else:
-            super.init_cond(type)
+            super().init_cond(type)
 
 
     def burgers_flux(self, q):
@@ -230,6 +230,38 @@ if __name__ == "__main__":
     pyplot.xlabel("$x$")
     pyplot.ylabel("$u$")
     pyplot.savefig("weno-burger-sine.pdf")
+    
+    # Compare the WENO and "standard" (from burgers.py) results at low res
+    nx = 64
+    tend = 0.2
+    g_hires = burgers.Grid1d(512, ng, bc="periodic")
+    s_hires = WENOSimulation(g_hires, C, order)
+    s_hires.init_cond("sine")
+    s_hires.evolve(tend)
+    gW3 = burgers.Grid1d(nx, 4, bc="periodic")
+    sW3 = WENOSimulation(gW3, C, 3)
+    sW3.init_cond("sine")
+    sW3.evolve(tend)
+    gW5 = burgers.Grid1d(nx, 6, bc="periodic")
+    sW5 = WENOSimulation(gW5, C, 5)
+    sW5.init_cond("sine")
+    sW5.evolve(tend)
+    g = burgers.Grid1d(nx, ng, bc="periodic")
+    s = burgers.Simulation(g)
+    s.init_cond("sine")
+    s.evolve(C, tend)
+    pyplot.clf()
+    pyplot.plot(g_hires.x[g_hires.ilo:g_hires.ihi+1], 
+                g_hires.u[g_hires.ilo:g_hires.ihi+1], 'k--', label='High resolution')
+    pyplot.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], 'gd', label='PLM, MC')
+    pyplot.plot(gW3.x[gW3.ilo:gW3.ihi+1], gW3.u[gW3.ilo:gW3.ihi+1], 'bo', label='WENO, r=3')
+    pyplot.plot(gW5.x[gW5.ilo:gW5.ihi+1], gW5.u[gW5.ilo:gW5.ihi+1], 'r^', label='WENO, r=5')
+    pyplot.xlabel("$x$")
+    pyplot.ylabel("$u$")
+    pyplot.legend()
+    pyplot.xlim(0.5, 0.9)
+    pyplot.legend(frameon=False)
+    pyplot.savefig("weno-vs-plm-burger.pdf")
     
     
     #-----------------------------------------------------------------------------
