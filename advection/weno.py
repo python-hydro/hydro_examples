@@ -196,6 +196,7 @@ class WENOSimulation(advection.Simulation):
 
         # main evolution loop
         while r.successful() and r.t < tmax:
+            dt = min(dt, tmax - r.t)
             r.integrate(r.t+dt)
         g.a[:] = r.y
 
@@ -251,6 +252,7 @@ class WENOMSimulation(WENOSimulation):
 
         # main evolution loop
         while r.successful() and r.t < tmax:
+            dt = min(dt, tmax - r.t)
             r.integrate(r.t+dt)
         g.a[:] = r.y
     
