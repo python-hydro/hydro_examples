@@ -194,11 +194,72 @@ class WENOSimulation(object):
         rhs[:, 1:-1] = 1/g.dx * (flux[:, 1:-1] - flux[:, 2:])
         return rhs
 
+    
+    def evecs(self, boundary_state):
+        revecs = numpy.zeros((3, 3))
+        levecs = numpy.zeros((3, 3))
+        rho, S, E = boundary_state
+        v = S / rho
+        p = (self.eos_gamma - 1) * (E - rho * v**2 / 2)
+        cs = numpy.sqrt(self.eos_gamma * p / rho)
+        b1 = (self.eos_gamma - 1) / cs**2
+        b2 = b1 * v**2 / 2
+        revecs[0, 0] = 1
+        revecs[0, 1] = v - cs
+        revecs[0, 2] = (E + p) / rho - v * cs
+        revecs[1, 0] = 1
+        revecs[1, 1] = v
+        revecs[1, 2] = v**2 / 2
+        revecs[2, 0] = 1
+        revecs[2, 1] = v + cs
+        revecs[2, 2] = (E + p) / rho + v * cs
+        levecs[0, 0] = (b2 + v / cs) / 2
+        levecs[0, 1] = -(b1 * v + 1 / cs) / 2
+        levecs[0, 2] = b1 / 2
+        levecs[1, 0] = 1 - b2
+        levecs[1, 1] = b1 * v
+        levecs[1, 2] = -b1
+        levecs[2, 0] = (b2 - v / cs) / 2
+        levecs[2, 1] = -(b1 * v - 1 / cs) / 2
+        levecs[2, 2] = b1 / 2
+        return revecs, levecs
 
-    def evolve(self, tmax):
+
+    def rk_substep_characteristic(self):
+        
+        g = self.grid
+        g.fill_BCs()
+        f = self.euler_flux(g.q)
+        alpha = self.max_lambda()
+        fp = (f + alpha * g.q) / 2
+        fm = (f - alpha * g.q) / 2
+        char_fm = g.scratch_array()
+        char_fp = g.scratch_array()
+        fpr = g.scratch_array()
+        fml = g.scratch_array()
+        flux = g.scratch_array()
+        for i in range(g.ilo, g.ihi+1):
+            boundary_state = (g.q[:, i-1] + g.q[:, i]) / 2
+            revecs, levecs = self.evecs(boundary_state)
+            for j in range(i-g.ng, i+g.ng+1):
+                char_fm[:, j] = numpy.dot(levecs, fm[:, j])
+                char_fp[:, j] = numpy.dot(levecs, fp[:, j])
+            fpr[:, i] = weno(self.weno_order, char_fp[:, i-g.ng:i+g.ng])
+            fml[:, i] = weno(self.weno_order, char_fm[:, i+g.ng-1:i-g.ng-1:-1])
+            flux[:, i] = numpy.dot(revecs, fpr[:, i] + fml[:, i])
+        rhs = g.scratch_array()
+        rhs[:, 1:-1] = 1/g.dx * (flux[:, 1:-1] - flux[:, 2:])
+        return rhs
+
+
+    def evolve(self, tmax, reconstruction = 'componentwise'):
         """ evolve the Euler equation using RK4 """
         self.t = 0.0
         g = self.grid
+        
+        stepper = self.rk_substep
+        if reconstruction == 'characteristic':
+            stepper = self.rk_substep_characteristic
 
         # main evolution loop
         while self.t < tmax:
@@ -215,13 +276,13 @@ class WENOSimulation(object):
             # RK4
             # Store the data at the start of the step
             q_start = g.q.copy()
-            k1 = dt * self.rk_substep()
+            k1 = dt * stepper()
             g.q = q_start + k1 / 2
-            k2 = dt * self.rk_substep()
+            k2 = dt * stepper()
             g.q = q_start + k2 / 2
-            k3 = dt * self.rk_substep()
+            k3 = dt * stepper()
             g.q = q_start + k3
-            k4 = dt * self.rk_substep()
+            k4 = dt * stepper()
             g.q = q_start + (k1 + 2 * (k2 + k3) + k4) / 6
 
             self.t += dt
