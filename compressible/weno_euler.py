@@ -226,10 +226,18 @@ class WENOSimulation(object):
 
 
     def rk_substep_characteristic(self):
+        """
+        There is a major issue with the way that I've set up the weno
+        function that means the code below requires the number of ghostzones
+        to be weno_order+2, not just weno_order+1. This should not be needed,
+        but I am too lazy to modify every weno routine to remove the extra,
+        not required, point.
+        """
         
         g = self.grid
         g.fill_BCs()
         f = self.euler_flux(g.q)
+        w_o = self.weno_order
         alpha = self.max_lambda()
         fp = (f + alpha * g.q) / 2
         fm = (f - alpha * g.q) / 2
@@ -238,14 +246,16 @@ class WENOSimulation(object):
         fpr = g.scratch_array()
         fml = g.scratch_array()
         flux = g.scratch_array()
-        for i in range(g.ilo, g.ihi+1):
+        for i in range(g.ilo, g.ihi+2):
             boundary_state = (g.q[:, i-1] + g.q[:, i]) / 2
             revecs, levecs = self.evecs(boundary_state)
-            for j in range(i-g.ng, i+g.ng+1):
-                char_fm[:, j] = numpy.dot(levecs, fm[:, j])
-                char_fp[:, j] = numpy.dot(levecs, fp[:, j])
-            fpr[:, i] = weno(self.weno_order, char_fp[:, i-g.ng:i+g.ng])
-            fml[:, i] = weno(self.weno_order, char_fm[:, i+g.ng-1:i-g.ng-1:-1])
+            for j in range(i-w_o-1, i+w_o+2):
+                char_fm[:, j] = numpy.dot(fm[:, j], levecs)
+                char_fp[:, j] = numpy.dot(fp[:, j], levecs)
+            fpr[:, i-w_o:i+w_o+2] = weno(self.weno_order,
+                                           char_fp[:, i-w_o-1:i+w_o+1])
+            fml[:, i+w_o+1:i-w_o-1:-1] = weno(self.weno_order,
+                                               char_fm[:, i+w_o+1:i-w_o-1:-1])
             flux[:, i] = numpy.dot(revecs, fpr[:, i] + fml[:, i])
         rhs = g.scratch_array()
         rhs[:, 1:-1] = 1/g.dx * (flux[:, 1:-1] - flux[:, 2:])
@@ -275,15 +285,24 @@ class WENOSimulation(object):
 
             # RK4
             # Store the data at the start of the step
+#            q_start = g.q.copy()
+#            k1 = dt * stepper()
+#            g.q = q_start + k1 / 2
+#            k2 = dt * stepper()
+#            g.q = q_start + k2 / 2
+#            k3 = dt * stepper()
+#            g.q = q_start + k3
+#            k4 = dt * stepper()
+#            g.q = q_start + (k1 + 2 * (k2 + k3) + k4) / 6
+
+            # RK3: this is SSP
+            # Store the data at the start of the step
             q_start = g.q.copy()
-            k1 = dt * stepper()
-            g.q = q_start + k1 / 2
-            k2 = dt * stepper()
-            g.q = q_start + k2 / 2
-            k3 = dt * stepper()
-            g.q = q_start + k3
-            k4 = dt * stepper()
-            g.q = q_start + (k1 + 2 * (k2 + k3) + k4) / 6
+            q1 = q_start + dt * stepper()
+            g.q[:, :] = q1[:, :]
+            q2 = (3 * q_start + q1 + dt * stepper()) / 4
+            g.q[:, :] = q2[:, :]
+            g.q = (q_start + 2 * q2 + 2 * dt * stepper()) / 3
 
             self.t += dt
 #            print("t=", self.t)
@@ -303,8 +322,9 @@ if __name__ == "__main__":
     x_e, rho_e, v_e, p_e = rp.sample_solution(0.2, 1024)
     e_e = p_e / 0.4 / rho_e
     
-    #-----------------------------------------------------------------------------
-    # Sod
+    #----------------------------------------------
+    # Sod comparison
+    
     
     xmin = -0.5
     xmax = 0.5
@@ -313,53 +333,44 @@ if __name__ == "__main__":
     tmax = 0.2
     C = 0.5
     
-    for order in range(3, 7):
+    for order in range(3, 8):
+        ng = order+2
+        fig, axes = pyplot.subplots(4, 2,
+                                    sharex=True,
+                                    figsize=(6,10))
+        for i, recon in enumerate(["componentwise", "characteristic"]):
     
-        ng = order+1
-        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
-        
-        pyplot.clf()
-        
-        s = WENOSimulation(g, C, order)
-        s.init_cond("sod")
-        s.evolve(tmax)
-        g = s.grid
-        x = g.x + 0.5
-        rho = g.q[0, :]
-        v = g.q[1, :] / g.q[0, :]
-        e = (g.q[2, :] - rho * v**2 / 2) / rho
-        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
-        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
-        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
-        axes[0].plot(x_e, rho_e, 'k--')
-        axes[0].set_ylabel(r"$\rho$")
-        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
-        axes[1].plot(x_e, v_e, 'k--')
-        axes[1].set_ylabel(r"$u$")
-        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
-        axes[2].plot(x_e, p_e, 'k--')
-        axes[2].set_xlabel(r"$x$")
-        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
-        axes[3].plot(x_e, e_e, 'k--')
-        axes[3].set_xlabel(r"$x$")
-        axes[3].set_ylabel(r"$e$")
-        for ax in axes:
+            g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
+            s = WENOSimulation(g, C, order)
+            s.init_cond("sod")
+            s.evolve(tmax, reconstruction=recon)
+            g = s.grid
+            x = g.x + 0.5
+            rho = g.q[0, :]
+            v = g.q[1, :] / g.q[0, :]
+            e = (g.q[2, :] - rho * v**2 / 2) / rho
+            p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
+            axes[0, i].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
+            axes[0, i].plot(x_e, rho_e, 'k--')
+            axes[1, i].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
+            axes[1, i].plot(x_e, v_e, 'k--')
+            axes[2, i].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
+            axes[2, i].plot(x_e, p_e, 'k--')
+            axes[3, i].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
+            axes[3, i].plot(x_e, e_e, 'k--')
+            axes[3, i].set_xlabel(r"$x$")
+        axes[0, 0].set_ylabel(r"$\rho$")
+        axes[1, 0].set_ylabel(r"$u$")
+        axes[2, 0].set_ylabel(r"$p$")
+        axes[3, 0].set_ylabel(r"$e$")
+        for ax in axes.flatten():
             ax.set_xlim(0, 1)
-        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
+        axes[0, 0].set_title(r"WENO, $r={}$, componentwise".format(order))
+        axes[0, 1].set_title(r"WENO, $r={}$, characteristicwise".format(order))
         fig.tight_layout()
-        pyplot.show()
+        pyplot.savefig("weno-euler-r{}.pdf".format(order))
+#        pyplot.show()
 
-
-#    # setup the problem -- double rarefaction
-#    left = riemann.State(p=0.4, u=-2.0, rho=1.0)
-#    right = riemann.State(p=0.4, u=2.0, rho=1.0)
-#
-#    rp = riemann.RiemannProblem(left, right)
-#    rp.find_star_state()
-#
-#    x_e, rho_e, v_e, p_e = rp.sample_solution(0.1, 1024)
-#    e_e = p_e / 0.4 / rho_e
-#    
 #    #-----------------------------------------------------------------------------
 #    # Sod
 #    
@@ -367,7 +378,7 @@ if __name__ == "__main__":
 #    xmax = 0.5
 #    nx = 64
 #    
-#    tmax = 0.1
+#    tmax = 0.2
 #    C = 0.5
 #    
 #    for order in range(3, 7):
@@ -378,7 +389,7 @@ if __name__ == "__main__":
 #        pyplot.clf()
 #        
 #        s = WENOSimulation(g, C, order)
-#        s.init_cond("double rarefaction")
+#        s.init_cond("sod")
 #        s.evolve(tmax)
 #        g = s.grid
 #        x = g.x + 0.5
@@ -405,45 +416,107 @@ if __name__ == "__main__":
 #        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
 #        fig.tight_layout()
 #        pyplot.show()
+#
+#    #-----------------------------------------------------------------------------
+#    # Sod characteristicwise
+#    
+#    xmin = -0.5
+#    xmax = 0.5
+#    nx = 64
+#    
+#    tmax = 0.2
+#    C = 0.5
+#    
+#    for order in range(3, 7):
+#    
+#        ng = order+2
+#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
+#        
+#        pyplot.clf()
+#        
+#        s = WENOSimulation(g, C, order)
+#        s.init_cond("sod")
+#        s.evolve(tmax, reconstruction='characteristic')
+#        g = s.grid
+#        x = g.x + 0.5
+#        rho = g.q[0, :]
+#        v = g.q[1, :] / g.q[0, :]
+#        e = (g.q[2, :] - rho * v**2 / 2) / rho
+#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
+#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
+#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
+#        axes[0].plot(x_e, rho_e, 'k--')
+#        axes[0].set_ylabel(r"$\rho$")
+#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
+#        axes[1].plot(x_e, v_e, 'k--')
+#        axes[1].set_ylabel(r"$u$")
+#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
+#        axes[2].plot(x_e, p_e, 'k--')
+#        axes[2].set_xlabel(r"$x$")
+#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
+#        axes[3].plot(x_e, e_e, 'k--')
+#        axes[3].set_xlabel(r"$x$")
+#        axes[3].set_ylabel(r"$e$")
+#        for ax in axes:
+#            ax.set_xlim(0, 1)
+#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
+#        fig.tight_layout()
+#        pyplot.show()
 
-
-    # Advection
-    # There seems to be an odd instability kicking in after t=1
-    # Vacuum formation?
-    # Changing the lower threshold has no impact
-    # But it warns about invalid sqrt in the speed of sound, so
-    # negative density. Odd.
-    # Might want to check BCs.
-    
-    xmin = 0
-    xmax = 1
-    nx = 64
-    
-    tmax = 1
-    C = 0.5
-    
-    order = 3
-    ng = order+1
-    g = Grid1d(nx, ng, xmin, xmax, bc="periodic")
-    
-    pyplot.clf()
-    
-    s = WENOSimulation(g, C, order)
-    s.init_cond("advection")
-    rho_0 = s.grid.q[0, :].copy()
-    s.evolve(tmax)
-    g = s.grid
-    rho = g.q[0, :]
-    v = g.q[1, :] / g.q[0, :]
-    e = (g.q[2, :] - rho * v**2 / 2) / rho
-    p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
-    pyplot.plot(g.x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo',
-                label=r"WENO, r={}".format(order))
-    pyplot.plot(g.x[g.ilo:g.ihi+1], rho_0[g.ilo:g.ihi+1], 'k-',
-                label="Exact")
-    pyplot.legend()
-    pyplot.xlabel(r"$x$")
-    pyplot.ylabel(r"$\rho$")
-    pyplot.xlim(0, 1)
-    pyplot.show()
-    
+#
+#    # setup the problem -- double rarefaction
+#    left = riemann.State(p=0.4, u=-2.0, rho=1.0)
+#    right = riemann.State(p=0.4, u=2.0, rho=1.0)
+#
+#    rp = riemann.RiemannProblem(left, right)
+#    rp.find_star_state()
+#
+#    x_e, rho_e, v_e, p_e = rp.sample_solution(0.1, 1024)
+#    e_e = p_e / 0.4 / rho_e
+#    
+#    #-----------------------------------------------------------------------------
+#    # Double rarefaction
+#    
+#    xmin = -0.5
+#    xmax = 0.5
+#    nx = 64
+#    
+#    tmax = 0.1
+#    C = 0.5
+#    
+#    for order in range(3, 7):
+#    
+#        ng = order+2
+#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
+#        
+#        pyplot.clf()
+#        
+#        s = WENOSimulation(g, C, order)
+#        s.init_cond("double rarefaction")
+#        s.evolve(tmax, reconstruction='characteristic')
+#        g = s.grid
+#        x = g.x + 0.5
+#        rho = g.q[0, :]
+#        v = g.q[1, :] / g.q[0, :]
+#        e = (g.q[2, :] - rho * v**2 / 2) / rho
+#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
+#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
+#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
+#        axes[0].plot(x_e, rho_e, 'k--')
+#        axes[0].set_ylabel(r"$\rho$")
+#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
+#        axes[1].plot(x_e, v_e, 'k--')
+#        axes[1].set_ylabel(r"$u$")
+#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
+#        axes[2].plot(x_e, p_e, 'k--')
+#        axes[2].set_xlabel(r"$x$")
+#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
+#        axes[3].plot(x_e, e_e, 'k--')
+#        axes[3].set_xlabel(r"$x$")
+#        axes[3].set_ylabel(r"$e$")
+#        for ax in axes:
+#            ax.set_xlim(0, 1)
+#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
+#        fig.tight_layout()
+#        pyplot.show()
+#
