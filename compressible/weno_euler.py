@@ -93,7 +93,8 @@ def weno(order, q):
                 for l in range(order):
                     for m in range(l+1):
                         beta[k, i] += sigma[k, l, m] * q[nv, i+k-l] * q[nv, i+k-m]
-                alpha[k] = C[k] / (epsilon + beta[k, i]**2)
+#                alpha[k] = C[k] / (epsilon + beta[k, i]**2)
+                alpha[k] = C[k] / (epsilon + abs(beta[k, i])**order)
                 for l in range(order):
                     q_stencils[k] += a[k, l] * q[nv, i+k-l]
             w[:, i] = alpha / numpy.sum(alpha)
