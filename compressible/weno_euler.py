@@ -137,7 +137,7 @@ class WENOSimulation(object):
                                          E_r * numpy.ones_like(self.grid.x))
         elif type == "advection":
             x = self.grid.x
-            rho_0 = 1e-2 # Note: cheated to avoid vacuum
+            rho_0 = 1e-3
             rho_1 = 1
             sigma = 0.1
             rho = rho_0 * numpy.ones_like(x)
@@ -150,6 +150,28 @@ class WENOSimulation(object):
             self.grid.q[0, :] = rho[:]
             self.grid.q[1, :] = S[:]
             self.grid.q[2, :] = E[:]
+        elif type == "double rarefaction":
+            rho_l = 1
+            rho_r = 1
+            v_l =-2
+            v_r = 2
+            p_l = 0.4
+            p_r = 0.4
+            S_l = rho_l * v_l
+            S_r = rho_r * v_r
+            e_l = p_l / rho_l / (self.eos_gamma - 1)
+            e_r = p_r / rho_r / (self.eos_gamma - 1)
+            E_l = rho_l * (e_l + v_l**2 / 2)
+            E_r = rho_r * (e_r + v_r**2 / 2)
+            self.grid.q[0] = numpy.where(self.grid.x < 0,
+                                         rho_l * numpy.ones_like(self.grid.x),
+                                         rho_r * numpy.ones_like(self.grid.x))
+            self.grid.q[1] = numpy.where(self.grid.x < 0,
+                                         S_l * numpy.ones_like(self.grid.x),
+                                         S_r * numpy.ones_like(self.grid.x))
+            self.grid.q[2] = numpy.where(self.grid.x < 0,
+                                         E_l * numpy.ones_like(self.grid.x),
+                                         E_r * numpy.ones_like(self.grid.x))
 
 
     def max_lambda(self):
@@ -233,6 +255,8 @@ class WENOSimulation(object):
         to be weno_order+2, not just weno_order+1. This should not be needed,
         but I am too lazy to modify every weno routine to remove the extra,
         not required, point.
+        
+        The results aren't symmetric, so I'm not 100% convinced this is right.
         """
         
         g = self.grid
@@ -323,6 +347,7 @@ if __name__ == "__main__":
     x_e, rho_e, v_e, p_e = rp.sample_solution(0.2, 1024)
     e_e = p_e / 0.4 / rho_e
     
+    
     #----------------------------------------------
     # Sod comparison
     
@@ -372,152 +397,62 @@ if __name__ == "__main__":
         pyplot.savefig("weno-euler-r{}.pdf".format(order))
 #        pyplot.show()
 
-#    #-----------------------------------------------------------------------------
-#    # Sod
-#    
-#    xmin = -0.5
-#    xmax = 0.5
-#    nx = 64
-#    
-#    tmax = 0.2
-#    C = 0.5
-#    
-#    for order in range(3, 7):
-#    
-#        ng = order+1
-#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
-#        
-#        pyplot.clf()
-#        
-#        s = WENOSimulation(g, C, order)
-#        s.init_cond("sod")
-#        s.evolve(tmax)
-#        g = s.grid
-#        x = g.x + 0.5
-#        rho = g.q[0, :]
-#        v = g.q[1, :] / g.q[0, :]
-#        e = (g.q[2, :] - rho * v**2 / 2) / rho
-#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
-#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
-#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
-#        axes[0].plot(x_e, rho_e, 'k--')
-#        axes[0].set_ylabel(r"$\rho$")
-#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
-#        axes[1].plot(x_e, v_e, 'k--')
-#        axes[1].set_ylabel(r"$u$")
-#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
-#        axes[2].plot(x_e, p_e, 'k--')
-#        axes[2].set_xlabel(r"$x$")
-#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
-#        axes[3].plot(x_e, e_e, 'k--')
-#        axes[3].set_xlabel(r"$x$")
-#        axes[3].set_ylabel(r"$e$")
-#        for ax in axes:
-#            ax.set_xlim(0, 1)
-#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
-#        fig.tight_layout()
-#        pyplot.show()
-#
-#    #-----------------------------------------------------------------------------
-#    # Sod characteristicwise
-#    
-#    xmin = -0.5
-#    xmax = 0.5
-#    nx = 64
-#    
-#    tmax = 0.2
-#    C = 0.5
-#    
-#    for order in range(3, 7):
-#    
-#        ng = order+2
-#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
-#        
-#        pyplot.clf()
-#        
-#        s = WENOSimulation(g, C, order)
-#        s.init_cond("sod")
-#        s.evolve(tmax, reconstruction='characteristic')
-#        g = s.grid
-#        x = g.x + 0.5
-#        rho = g.q[0, :]
-#        v = g.q[1, :] / g.q[0, :]
-#        e = (g.q[2, :] - rho * v**2 / 2) / rho
-#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
-#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
-#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
-#        axes[0].plot(x_e, rho_e, 'k--')
-#        axes[0].set_ylabel(r"$\rho$")
-#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
-#        axes[1].plot(x_e, v_e, 'k--')
-#        axes[1].set_ylabel(r"$u$")
-#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
-#        axes[2].plot(x_e, p_e, 'k--')
-#        axes[2].set_xlabel(r"$x$")
-#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
-#        axes[3].plot(x_e, e_e, 'k--')
-#        axes[3].set_xlabel(r"$x$")
-#        axes[3].set_ylabel(r"$e$")
-#        for ax in axes:
-#            ax.set_xlim(0, 1)
-#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
-#        fig.tight_layout()
-#        pyplot.show()
 
-#
-#    # setup the problem -- double rarefaction
-#    left = riemann.State(p=0.4, u=-2.0, rho=1.0)
-#    right = riemann.State(p=0.4, u=2.0, rho=1.0)
-#
-#    rp = riemann.RiemannProblem(left, right)
-#    rp.find_star_state()
-#
-#    x_e, rho_e, v_e, p_e = rp.sample_solution(0.1, 1024)
-#    e_e = p_e / 0.4 / rho_e
-#    
-#    #-----------------------------------------------------------------------------
-#    # Double rarefaction
-#    
-#    xmin = -0.5
-#    xmax = 0.5
-#    nx = 64
-#    
-#    tmax = 0.1
-#    C = 0.5
-#    
-#    for order in range(3, 7):
-#    
-#        ng = order+2
-#        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
-#        
-#        pyplot.clf()
-#        
-#        s = WENOSimulation(g, C, order)
-#        s.init_cond("double rarefaction")
+
+    # setup the problem -- double rarefaction
+    left = riemann.State(p=0.4, u=-2.0, rho=1.0)
+    right = riemann.State(p=0.4, u=2.0, rho=1.0)
+
+    rp = riemann.RiemannProblem(left, right)
+    rp.find_star_state()
+
+    x_e, rho_e, v_e, p_e = rp.sample_solution(0.1, 1024)
+    e_e = p_e / 0.4 / rho_e
+    
+    #-----------------------------------------------------------------------------
+    # Double rarefaction
+    
+    xmin = -0.5
+    xmax = 0.5
+    nx = 64
+    
+    tmax = 0.1
+    C = 0.5
+    
+    for order in range(3, 7):
+    
+        ng = order+2
+        g = Grid1d(nx, ng, xmin, xmax, bc="outflow")
+        
+        pyplot.clf()
+        
+        s = WENOSimulation(g, C, order)
+        s.init_cond("double rarefaction")
+        s.evolve(tmax)
 #        s.evolve(tmax, reconstruction='characteristic')
-#        g = s.grid
-#        x = g.x + 0.5
-#        rho = g.q[0, :]
-#        v = g.q[1, :] / g.q[0, :]
-#        e = (g.q[2, :] - rho * v**2 / 2) / rho
-#        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
-#        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
-#        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
-#        axes[0].plot(x_e, rho_e, 'k--')
-#        axes[0].set_ylabel(r"$\rho$")
-#        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
-#        axes[1].plot(x_e, v_e, 'k--')
-#        axes[1].set_ylabel(r"$u$")
-#        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
-#        axes[2].plot(x_e, p_e, 'k--')
-#        axes[2].set_xlabel(r"$x$")
-#        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
-#        axes[3].plot(x_e, e_e, 'k--')
-#        axes[3].set_xlabel(r"$x$")
-#        axes[3].set_ylabel(r"$e$")
-#        for ax in axes:
-#            ax.set_xlim(0, 1)
-#        axes[0].set_title(r"Sod test, WENO, $r={}$".format(order))
-#        fig.tight_layout()
-#        pyplot.show()
-#
+        g = s.grid
+        x = g.x + 0.5
+        rho = g.q[0, :]
+        v = g.q[1, :] / g.q[0, :]
+        e = (g.q[2, :] - rho * v**2 / 2) / rho
+        p = (s.eos_gamma - 1) * (g.q[2, :] - rho * v**2 / 2)
+        fig, axes = pyplot.subplots(4, 1, sharex=True, figsize=(6,10))
+        axes[0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
+        axes[0].plot(x_e, rho_e, 'k--')
+        axes[1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
+        axes[1].plot(x_e, v_e, 'k--')
+        axes[2].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
+        axes[2].plot(x_e, p_e, 'k--')
+        axes[3].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
+        axes[3].plot(x_e, e_e, 'k--')
+        axes[0].set_ylabel(r"$\rho$")
+        axes[1].set_ylabel(r"$u$")
+        axes[2].set_ylabel(r"$p$")
+        axes[3].set_xlabel(r"$x$")
+        axes[3].set_ylabel(r"$e$")
+        for ax in axes:
+            ax.set_xlim(0, 1)
+        axes[0].set_title(r"Double rarefaction, WENO, $r={}$".format(order))
+        fig.tight_layout()
+        pyplot.savefig("weno-euler-rarefaction-r{}.pdf".format(order))
+
