@@ -195,7 +195,7 @@ class Simulation(object):
         self.t = 0.0
 
         g = self.grid
-        
+
         # main evolution loop
         while (self.t < tmax):
 
@@ -222,80 +222,80 @@ class Simulation(object):
             self.t += dt
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     #-----------------------------------------------------------------------------
     # sine
-    
+
     xmin = 0.0
     xmax = 1.0
     nx = 256
     ng = 2
     g = Grid1d(nx, ng, bc="periodic")
-    
+
     # maximum evolution time based on period for unit velocity
     tmax = (xmax - xmin)/1.0
-    
+
     C = 0.8
-    
+
     plt.clf()
-    
+
     s = Simulation(g)
-    
+
     for i in range(0, 10):
         tend = (i+1)*0.02*tmax
         s.init_cond("sine")
-    
+
         uinit = s.grid.u.copy()
-    
+
         s.evolve(C, tend)
-    
+
         c = 1.0 - (0.1 + i*0.1)
         g = s.grid
         plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
-    
-    
+
+
     g = s.grid
     plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
-    
+
     plt.xlabel("$x$")
     plt.ylabel("$u$")
     plt.savefig("fv-burger-sine.pdf")
-    
-    
+
+
     #-----------------------------------------------------------------------------
     # rarefaction
-    
+
     xmin = 0.0
     xmax = 1.0
     nx = 256
     ng = 2
     g = Grid1d(nx, ng, bc="outflow")
-    
+
     # maximum evolution time based on period for unit velocity
     tmax = (xmax - xmin)/1.0
-    
+
     C = 0.8
-    
+
     plt.clf()
-    
+
     s = Simulation(g)
-    
+
     for i in range(0, 10):
         tend = (i+1)*0.02*tmax
-    
+
         s.init_cond("rarefaction")
-    
+
         uinit = s.grid.u.copy()
-    
+
         s.evolve(C, tend)
-    
+
         c = 1.0 - (0.1 + i*0.1)
         plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
-    
-    
+
+
     plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
-    
+
     plt.xlabel("$x$")
     plt.ylabel("$u$")
-    
+
     plt.savefig("fv-burger-rarefaction.pdf")
