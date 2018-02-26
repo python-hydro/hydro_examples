@@ -70,6 +70,14 @@ class Grid1d(object):
             sys.exit("invalid BC")
 
 
+    def norm(self, e):
+        """ return the norm of quantity e which lives on the grid """
+        if len(e) != 2*self.ng + self.nx:
+            return None
+
+        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+
+
 class Simulation(object):
 
     def __init__(self, grid):
@@ -105,21 +113,22 @@ class Simulation(object):
     def states(self, dt):
         """ compute the left and right interface states """
 
+        g = self.grid
         # compute the piecewise linear slopes -- 2nd order MC limiter
         # we pick a range of cells that includes 1 ghost cell on either
         # side
-        ib = self.grid.ilo-1
-        ie = self.grid.ihi+1
+        ib = g.ilo-1
+        ie = g.ihi+1
 
-        u = self.grid.u
+        u = g.u
 
         # this is the MC limiter from van Leer (1977), as given in
         # LeVeque (2002).  Note that this is slightly different than
         # the expression from Colella (1990)
 
-        dc = self.grid.scratch_array()
-        dl = self.grid.scratch_array()
-        dr = self.grid.scratch_array()
+        dc = g.scratch_array()
+        dl = g.scratch_array()
+        dr = g.scratch_array()
 
         dc[ib:ie+1] = 0.5*(u[ib+1:ie+2] - u[ib-1:ie  ])
         dl[ib:ie+1] = u[ib+1:ie+2] - u[ib  :ie+1]
@@ -185,6 +194,8 @@ class Simulation(object):
 
         self.t = 0.0
 
+        g = self.grid
+
         # main evolution loop
         while (self.t < tmax):
 
@@ -211,80 +222,80 @@ class Simulation(object):
             self.t += dt
 
 
+if __name__ == "__main__":
+    #-----------------------------------------------------------------------------
+    # sine
 
-#-----------------------------------------------------------------------------
-# sine
+    xmin = 0.0
+    xmax = 1.0
+    nx = 256
+    ng = 2
+    g = Grid1d(nx, ng, bc="periodic")
 
-xmin = 0.0
-xmax = 1.0
-nx = 256
-ng = 2
-g = Grid1d(nx, ng, bc="periodic")
+    # maximum evolution time based on period for unit velocity
+    tmax = (xmax - xmin)/1.0
 
-# maximum evolution time based on period for unit velocity
-tmax = (xmax - xmin)/1.0
+    C = 0.8
 
-C = 0.8
+    plt.clf()
 
-plt.clf()
+    s = Simulation(g)
 
-s = Simulation(g)
+    for i in range(0, 10):
+        tend = (i+1)*0.02*tmax
+        s.init_cond("sine")
 
-for i in range(0, 10):
-    tend = (i+1)*0.02*tmax
-    s.init_cond("sine")
+        uinit = s.grid.u.copy()
 
-    uinit = s.grid.u.copy()
+        s.evolve(C, tend)
 
-    s.evolve(C, tend)
+        c = 1.0 - (0.1 + i*0.1)
+        g = s.grid
+        plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
 
-    c = 1.0 - (0.1 + i*0.1)
+
     g = s.grid
-    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
+    plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
+
+    plt.xlabel("$x$")
+    plt.ylabel("$u$")
+    plt.savefig("fv-burger-sine.pdf")
 
 
-g = s.grid
-plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
+    #-----------------------------------------------------------------------------
+    # rarefaction
 
-plt.xlabel("$x$")
-plt.ylabel("$u$")
-plt.savefig("fv-burger-sine.pdf")
+    xmin = 0.0
+    xmax = 1.0
+    nx = 256
+    ng = 2
+    g = Grid1d(nx, ng, bc="outflow")
 
+    # maximum evolution time based on period for unit velocity
+    tmax = (xmax - xmin)/1.0
 
-#-----------------------------------------------------------------------------
-# rarefaction
+    C = 0.8
 
-xmin = 0.0
-xmax = 1.0
-nx = 256
-ng = 2
-g = Grid1d(nx, ng, bc="outflow")
+    plt.clf()
 
-# maximum evolution time based on period for unit velocity
-tmax = (xmax - xmin)/1.0
+    s = Simulation(g)
 
-C = 0.8
+    for i in range(0, 10):
+        tend = (i+1)*0.02*tmax
 
-plt.clf()
+        s.init_cond("rarefaction")
 
-s = Simulation(g)
+        uinit = s.grid.u.copy()
 
-for i in range(0, 10):
-    tend = (i+1)*0.02*tmax
+        s.evolve(C, tend)
 
-    s.init_cond("rarefaction")
-
-    uinit = s.grid.u.copy()
-
-    s.evolve(C, tend)
-
-    c = 1.0 - (0.1 + i*0.1)
-    plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
+        c = 1.0 - (0.1 + i*0.1)
+        plt.plot(g.x[g.ilo:g.ihi+1], g.u[g.ilo:g.ihi+1], color=str(c))
 
 
-plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
+    plt.plot(g.x[g.ilo:g.ihi+1], uinit[g.ilo:g.ihi+1], ls=":", color="0.9", zorder=-1)
 
-plt.xlabel("$x$")
-plt.ylabel("$u$")
+    plt.xlabel("$x$")
+    plt.ylabel("$u$")
 
-plt.savefig("fv-burger-rarefaction.pdf")
+    plt.savefig("fv-burger-rarefaction.pdf")
