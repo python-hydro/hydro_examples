@@ -24,13 +24,13 @@ if __name__ == "__main__":
     #right = riemann.State(p=1.0, u=-10.9636, rho=1.0)
 
     # slow shock
-    left = riemann.State(p=100.0, u=-1.5336, rho=5.6698)
-    right = riemann.State(p=1.0, u=-10.5636, rho=1.0)
+    left = riemann.State(p=100.0, u=-1.4701, rho=5.6698)
+    right = riemann.State(p=1.0, u=-10.5, rho=1.0)
 
     rp = riemann.RiemannProblem(left, right)
     rp.find_star_state()
 
-    x, rho, u, p = rp.sample_solution(0.2, 128)
+    x, rho, u, p = rp.sample_solution(1.0, 128)
 
     plt.subplot(311)
 
