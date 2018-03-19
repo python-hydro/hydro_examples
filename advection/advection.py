@@ -64,6 +64,8 @@ class Grid1d(object):
         # physical coords -- cell-centered, left and right edges
         self.dx = (xmax - xmin)/(nx)
         self.x = xmin + (np.arange(nx+2*ng)-ng+0.5)*self.dx
+        self.xl = xmin + (np.arange(nx+2*ng)-ng)*self.dx
+        self.xr = xmin + (np.arange(nx+2*ng)+1.0)*self.dx
 
         # storage for the solution
         self.a = np.zeros((nx+2*ng), dtype=np.float64)
@@ -89,7 +91,8 @@ class Grid1d(object):
         if len(e) != 2*self.ng + self.nx:
             return None
 
-        return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+        #return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+        return np.max(abs(e[self.ilo:self.ihi+1]))
 
 
 class Simulation(object):
@@ -113,7 +116,11 @@ class Simulation(object):
             self.grid.a[:] = np.sin(2.0*np.pi*self.grid.x/(self.grid.xmax-self.grid.xmin))
 
         elif type == "gaussian":
-            self.grid.a[:] = 1.0 + np.exp(-60.0*(self.grid.x - 0.5)**2)
+            al = 1.0 + np.exp(-60.0*(self.grid.xl - 0.5)**2)
+            ar = 1.0 + np.exp(-60.0*(self.grid.xr - 0.5)**2)
+            ac = 1.0 + np.exp(-60.0*(self.grid.x - 0.5)**2)
+            
+            self.grid.a[:] = (1./6.)*(al + 4*ac + ar)
 
 
     def timestep(self):
@@ -302,6 +309,7 @@ if __name__ == "__main__":
     ng = 2
     N = [32, 64, 128, 256, 512]
 
+    err_god = []
     err_nolim = []
     err_lim = []
     err_lim2 = []
@@ -311,12 +319,19 @@ if __name__ == "__main__":
     for nx in N:
 
         # no limiting
+        gg = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
+        sg = Simulation(gg, u, C=0.8, slope_type="godunov")
+        sg.init_cond("gaussian")
+        ainit = sg.grid.a.copy()
+        sg.evolve(num_periods=5)
+
+        err_god.append(gg.norm(gg.a - ainit))
+
+        # no limiting
         gu = Grid1d(nx, ng, xmin=xmin, xmax=xmax)
         su = Simulation(gu, u, C=0.8, slope_type="centered")
-
         su.init_cond("gaussian")
         ainit = su.grid.a.copy()
-
         su.evolve(num_periods=5)
 
         err_nolim.append(gu.norm(gu.a - ainit))
@@ -349,11 +364,14 @@ if __name__ == "__main__":
     err_lim = np.array(err_lim)
     err_lim2 = np.array(err_lim2)
 
-    plt.scatter(N, err_nolim, label="unlimited center")
-    plt.scatter(N, err_lim, label="MC")
-    plt.scatter(N, err_lim2, label="minmod")
+    plt.scatter(N, err_god, label="Godunov", color="C0")
+    plt.scatter(N, err_nolim, label="unlimited center", color="C1")
+    plt.scatter(N, err_lim, label="MC", color="C2")
+    plt.scatter(N, err_lim2, label="minmod", color="C3")
+    plt.plot(N, err_god[len(N)-1]*(N[len(N)-1]/N),
+             color="k", label=r"$\mathcal{O}(\Delta x)$")
     plt.plot(N, err_nolim[len(N)-1]*(N[len(N)-1]/N)**2,
-             color="k", label=r"$\mathcal{O}(\Delta x^2)$")
+             color="0.5", label=r"$\mathcal{O}(\Delta x^2)$")
 
     ax = plt.gca()
     ax.set_xscale('log')
@@ -363,7 +381,7 @@ if __name__ == "__main__":
     plt.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                fontsize=16)
 
-    plt.legend(frameon=False)
+    plt.legend(frameon=False, loc="best", fontsize="small")
 
     plt.savefig("plm-converge.pdf")
 
@@ -373,7 +391,7 @@ if __name__ == "__main__":
 
     xmin = 0.0
     xmax = 1.0
-    nx = 128
+    nx = 32
     ng = 2
 
     u = 1.0

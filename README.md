@@ -27,6 +27,9 @@ https://github.com/zingale/pyro2
   - `fdadvect.py`: a 1-d first-order explicit finite-difference linear
     advection solver using upwinded differencing.
 
+  - `fv_mol.py`: a 1-d method-of-lines second-order accurate advection
+     solver.
+     
   - `Fortran/`:
 
     * `advect.f90`: a Fortran implementation of second-order linear
