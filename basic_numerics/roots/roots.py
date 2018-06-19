@@ -1,6 +1,8 @@
-# use bisection, Newton's method, or secant method to find roots
-#
-# M. Zingale (2013-02-14)
+"""
+use bisection, Newton's method, or secant method to find roots
+
+ M. Zingale
+"""
 
 from __future__ import print_function
 
@@ -29,7 +31,7 @@ def hprime(x):
     return 2.0*x
 
 
-class root:
+class Root(object):
     """ simple class to manage root finding.  All method take in a
         function and desired tolerance """
 
@@ -38,7 +40,6 @@ class root:
         self.fprime = fprime
 
         self.tol = tol
-
 
     def bisection(self, xl, xr):
         """ find the root using bisection.  xl and xr should bracket
@@ -50,7 +51,7 @@ class root:
         # initial evaluations
         fl = self.f(xl)
         fr = self.f(xr)
-        
+
         xeval.append(xl)
         xeval.append(xr)
 
@@ -60,10 +61,10 @@ class root:
             return None
 
         err = abs(xr - xl)
-        while (err > self.tol):
+        while err > self.tol:
             xm = 0.5*(xl + xr)
             fm = self.f(xm)
-            
+
             xeval.append(xm)
 
             if fm*fl >= 0:
@@ -80,7 +81,6 @@ class root:
 
         return 0.5*(xl + xm), xeval
 
-
     def newton(self, x0):
         """ find the root via Newton's method.  x0 is the initial guess
             for the root """
@@ -91,14 +91,13 @@ class root:
         dx = -self.f(x0)/self.fprime(x0)
         xeval.append(x0)
         x = x0 + dx
-        
-        while (abs(dx) > self.tol):
-            dx = -self.f(x)/self.fprime(x)            
+
+        while abs(dx) > self.tol:
+            dx = -self.f(x)/self.fprime(x)
             xeval.append(x)
             x += dx
 
         return x, xeval
-
 
     def secant(self, xm1, x0):
         """ find the root via Newton's method.  xm1 and x0 are two
@@ -111,21 +110,22 @@ class root:
 
         # loop.  xm1 will always carry the previous estimate for the
         # root
-        while (abs(dx) > self.tol):
+        while abs(dx) > self.tol:
             dx = -self.f(x)*(x - xm1)/(self.f(x) - self.f(xm1))
             xm1 = x
             x += dx
-
 
         return x
 
 
 def main():
-    r = root(h, 1.e-6, fprime=hprime)
+    """a simple test driver"""
+
+    r = Root(h, 1.e-6, fprime=hprime)
     #rootb, xeval = r.bisection(0.0, 10.0)
     rootn, xeval = r.newton(10.0)
     #roots = r.secant(10.0, 9.0)
-    
+
     #print "Bisection: ", rootb
     print("Newton:    ", rootn, xeval)
     #print "Secant:    ", roots
@@ -133,7 +133,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-                
