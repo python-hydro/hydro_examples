@@ -16,6 +16,8 @@ class Grid1d(object):
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0, np=3):
 
+        assert np > 1
+        
         self.ng = ng
         self.nx = nx
         self.np = np
@@ -40,19 +42,24 @@ class Grid1d(object):
         self.a = numpy.zeros((self.np, nx+2*ng), dtype=numpy.float64)
         
         # Need the Gauss-Lobatto nodes and weights in the reference element
-        GL = quadpy.line_segment.GaussLobatto(np+2)
+        GL = quadpy.line_segment.GaussLobatto(np)
         self.nodes = GL.points
         self.weights = GL.weights
         # To go from modal to nodal we need the Vandermonde matrix
-        self.V = numpy.zeros((np+2, np+2))
-        for n in range(np+2):
-            c = numpy.zeros(n)
-            c[n] = 1
-            self.V[:, n] = numpy.polynomial.legendre.legval(self.nodes, c)
-        # We can now get the nodal values from self.V @ self.a[:, i]
+        self.V = numpy.zeros((np, np))
+        c = numpy.eye(np)
+        self.V = numpy.polynomial.legendre.legval(self.nodes, c)
+        self.V_inv = numpy.linalg.inv(self.V)
+#        print("first", self.V)
+#        for n in range(np):
+#            c = numpy.zeros(n+1)
+#            c[n] = 1
+#            self.V[:, n] = numpy.polynomial.legendre.legval(self.nodes, c)
+#        # We can now get the nodal values from self.V @ self.a[:, i]
+#        print("second", self.V)
         
         # Need the weights multiplied by P_p' for the interior flux
-        self.modified_weights = numpy.zeros((np, np+2))
+        self.modified_weights = numpy.zeros((np, np))
         for p in range(np):
             pp_c = numpy.zeros(p+1)
             pp_c[p] = 1
@@ -61,9 +68,25 @@ class Grid1d(object):
             self.modified_weights[p, :] = self.weights * pp_prime_nodes
         
         # Nodes in the computational coordinates
-        self.all_nodes = numpy.zeros((np+2)*(nx+2*ng), dtype=numpy.float64)
+        self.all_nodes = numpy.zeros((np)*(nx+2*ng), dtype=numpy.float64)
+        self.all_nodes_per_node = numpy.zeros_like(self.a)
         for i in range(nx+2*ng):
-            self.all_nodes[(np+2)*i: (np+2)*(i+1)] = self.x + self.nodes * self.dx / 2
+            self.all_nodes[(np)*i: (np)*(i+1)] = self.x[i] + self.nodes * self.dx / 2
+            self.all_nodes_per_node[:, i] = self.x[i] + self.nodes * self.dx / 2
+    
+    def modal_to_nodal(self):
+        nodal = numpy.zeros_like(self.a)
+        for i in range(self.nx+2*self.ng):
+            nodal[:, i] = self.V @ self.a[:, i]
+        return nodal
+    
+    def nodal_to_modal(self, nodal):
+        for i in range(self.nx+2*self.ng):
+            self.a[:, i] = self.V_inv @ nodal[:, i]
+            
+    def plotting_data(self):
+        return (self.all_nodes,
+                self.modal_to_nodal().ravel(order='F'))
 
     def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
@@ -107,10 +130,12 @@ class Simulation(object):
         elif type == "sine":
             init_a = lambda x : numpy.sin(2.0*numpy.pi*x/(self.grid.xmax-self.grid.xmin))
 
-        nodal_a = init_a(self.grid.all_nodes)
-        for i in range(self.grid.np+2*self.grid.ng):
-            for p in range(self.grid.np):
-                self.grid.a[p, i] = numpy.sum(nodal_a[(self.grid.np+2)*i:(self.grid.np+2)*(i+1)] * self.V[:,p])
+        nodal_a = init_a(self.grid.all_nodes_per_node)
+#        pyplot.plot(self.grid.all_nodes, nodal_a.ravel(order='F'))
+#        pyplot.show()
+        self.grid.nodal_to_modal(nodal_a)
+#        for i in range(self.grid.nx+2*self.grid.ng):
+#            self.grid.a[:, i] = numpy.linalg.inv(self.grid.V) @ nodal_a[(self.grid.np)*i:(self.grid.np)*(i+1)]
 
 
     def timestep(self):
@@ -214,3 +239,26 @@ class Simulation(object):
             g.a = (a_start + 2 * a2 + 2 * k3) / 3
 
             self.t += dt
+
+
+if __name__ == "__main__":
+
+
+    #-------------------------------------------------------------------------
+    # compare limiting and no-limiting
+
+    xmin = 0.0
+    xmax = 1.0
+    nx = 500
+    ng = 1
+
+    g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=5)
+
+    u = 1.0
+
+    s = Simulation(g, u, C=0.5)
+    s.init_cond("sine")
+    ainit = s.grid.a.copy()
+    plot_x, plot_a = g.plotting_data()
+
+    pyplot.plot(plot_x, plot_a, 'kx')
