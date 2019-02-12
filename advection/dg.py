@@ -49,6 +49,8 @@ class Grid1d(object):
         c = numpy.eye(np)
         self.V = numpy.polynomial.legendre.legval(self.nodes, c)
         self.V_inv = numpy.linalg.inv(self.V)
+        self.M_inv = 2 / self.dx * self.V @ self.V.T
+        print("Inverse mass matrix is", self.M_inv)
 
         # Need the weights multiplied by P_p' for the interior flux
         self.modified_weights = numpy.zeros((np, np))
@@ -194,6 +196,9 @@ class Simulation(object):
         # Is it orthonormal?
 #        for p in range(g.np):
 #            rhs[p, :] *= (2*p + 1) / 2
+#        for p in range(g.np):
+#            rhs[p, :] *= (2 * p + 1) / g.dx**p
+        rhs = g.M_inv @ rhs
 
         return rhs
 
