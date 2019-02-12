@@ -11,13 +11,12 @@ mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['mathtext.rm'] = 'serif'
 
 
-
 class Grid1d(object):
 
     def __init__(self, nx, ng, xmin=0.0, xmax=1.0, np=3):
 
         assert np > 1
-        
+
         self.ng = ng
         self.nx = nx
         self.np = np
@@ -40,7 +39,7 @@ class Grid1d(object):
         # These are the modes of the solution at each point, so the
         # first index is the mode
         self.a = numpy.zeros((self.np, nx+2*ng), dtype=numpy.float64)
-        
+
         # Need the Gauss-Lobatto nodes and weights in the reference element
         GL = quadpy.line_segment.GaussLobatto(np)
         self.nodes = GL.points
@@ -50,40 +49,36 @@ class Grid1d(object):
         c = numpy.eye(np)
         self.V = numpy.polynomial.legendre.legval(self.nodes, c)
         self.V_inv = numpy.linalg.inv(self.V)
-#        print("first", self.V)
-#        for n in range(np):
-#            c = numpy.zeros(n+1)
-#            c[n] = 1
-#            self.V[:, n] = numpy.polynomial.legendre.legval(self.nodes, c)
-#        # We can now get the nodal values from self.V @ self.a[:, i]
-#        print("second", self.V)
-        
+
         # Need the weights multiplied by P_p' for the interior flux
         self.modified_weights = numpy.zeros((np, np))
         for p in range(np):
             pp_c = numpy.zeros(p+1)
             pp_c[p] = 1
             pp_prime_c = numpy.polynomial.legendre.legder(pp_c)
-            pp_prime_nodes = numpy.polynomial.legendre.legval(self.nodes, pp_prime_c)
+            pp_prime_nodes = numpy.polynomial.legendre.legval(self.nodes,
+                                                              pp_prime_c)
             self.modified_weights[p, :] = self.weights * pp_prime_nodes
-        
+
         # Nodes in the computational coordinates
         self.all_nodes = numpy.zeros((np)*(nx+2*ng), dtype=numpy.float64)
         self.all_nodes_per_node = numpy.zeros_like(self.a)
         for i in range(nx+2*ng):
-            self.all_nodes[(np)*i: (np)*(i+1)] = self.x[i] + self.nodes * self.dx / 2
-            self.all_nodes_per_node[:, i] = self.x[i] + self.nodes * self.dx / 2
-    
+            self.all_nodes[(np)*i:(np)*(i+1)] = (self.x[i] +
+                                                 self.nodes * self.dx / 2)
+            self.all_nodes_per_node[:, i] = (self.x[i] +
+                                             self.nodes * self.dx / 2)
+
     def modal_to_nodal(self):
         nodal = numpy.zeros_like(self.a)
         for i in range(self.nx+2*self.ng):
             nodal[:, i] = self.V @ self.a[:, i]
         return nodal
-    
+
     def nodal_to_modal(self, nodal):
         for i in range(self.nx+2*self.ng):
             self.a[:, i] = self.V_inv @ nodal[:, i]
-            
+
     def plotting_data(self):
         return (self.all_nodes,
                 self.modal_to_nodal().ravel(order='F'))
@@ -92,14 +87,12 @@ class Grid1d(object):
         """ return a scratch array dimensioned for our grid """
         return numpy.zeros((self.np, self.nx+2*self.ng), dtype=numpy.float64)
 
-
     def fill_BCs(self):
         """ fill all single ghostcell with periodic boundary conditions """
 
         for n in range(self.ng):
             # left boundary
             self.a[:, self.ilo-1-n] = self.a[:, self.ihi-n]
-
             # right boundary
             self.a[:, self.ihi+1+n] = self.a[:, self.ilo+n]
 
@@ -108,7 +101,7 @@ class Grid1d(object):
         if len(e) != 2*self.ng + self.nx:
             return None
 
-        #return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
+        # return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
         return numpy.max(abs(e[0, self.ilo:self.ihi+1]))
 
 
@@ -116,37 +109,34 @@ class Simulation(object):
 
     def __init__(self, grid, u, C=0.8):
         self.grid = grid
-        self.t = 0.0 # simulation time
-        self.u = u   # the constant advective velocity
-        self.C = C   # CFL number
-
+        self.t = 0.0  # simulation time
+        self.u = u    # the constant advective velocity
+        self.C = C    # CFL number
 
     def init_cond(self, type="sine"):
         """ initialize the data """
         if type == "tophat":
-            init_a = lambda x : numpy.where(numpy.logical_and(x >=0.333, x <=0.666), 
-                                            numpy.ones_like(x), numpy.zeros_like(x))
+            def init_a(x):
+                return numpy.where(numpy.logical_and(x >= 0.333,
+                                                     x <= 0.666),
+                                   numpy.ones_like(x),
+                                   numpy.zeros_like(x))
 
         elif type == "sine":
-            init_a = lambda x : numpy.sin(2.0*numpy.pi*x/(self.grid.xmax-self.grid.xmin))
+            def init_a(x):
+                return numpy.sin(2.0 * numpy.pi * x /
+                                 (self.grid.xmax - self.grid.xmin))
 
         nodal_a = init_a(self.grid.all_nodes_per_node)
-#        pyplot.plot(self.grid.all_nodes, nodal_a.ravel(order='F'))
-#        pyplot.show()
         self.grid.nodal_to_modal(nodal_a)
-#        for i in range(self.grid.nx+2*self.grid.ng):
-#            self.grid.a[:, i] = numpy.linalg.inv(self.grid.V) @ nodal_a[(self.grid.np)*i:(self.grid.np)*(i+1)]
-
 
     def timestep(self):
         """ return the advective timestep """
         return self.C*self.grid.dx/self.u
 
-
     def period(self):
         """ return the period for advection with velocity u """
         return (self.grid.xmax - self.grid.xmin)/self.u
-
 
     def states(self):
         """ compute the left and right interface states """
@@ -154,18 +144,18 @@ class Simulation(object):
         # Evaluate the nodal values at the domain edges
         g = self.grid
 
-        al = g.scratch_array()
-        ar = g.scratch_array()
+        al = numpy.zeros(g.nx+2*g.ng)
+        ar = numpy.zeros(g.nx+2*g.ng)
+
+        nodal = g.modal_to_nodal()
 
         # i is looping over interfaces, so al is the right edge of the left
         # element, etc.
         for i in range(g.ilo, g.ihi+2):
-            for p in range(g.np):
-                al[p, i] = numpy.dot(g.a[:, i-1], g.V[-1, :])
-                ar[p, i] = numpy.dot(g.a[:, i  ], g.V[ 0, :])
+            al[i] = nodal[-1, i-1]
+            ar[i] = nodal[ 0, i  ]
 
         return al, ar
-
 
     def riemann(self, al, ar):
         """
@@ -178,13 +168,14 @@ class Simulation(object):
         else:
             return self.u*ar
 
-
     def rk_substep(self):
-        
+        """
+        Take a single RK substep
+        """
         g = self.grid
         g.fill_BCs()
         rhs = g.scratch_array()
-        
+
         # Integrate flux over element
         interior_f = g.scratch_array()
         for p in range(g.np):
@@ -192,20 +183,19 @@ class Simulation(object):
                 nodal_a = g.V @ g.a[:, i]
                 nodal_f = self.u * nodal_a
                 interior_f[p, i] = numpy.dot(nodal_f, g.modified_weights[p, :])
-        
         # Use Riemann solver to get fluxes between elements
         boundary_f = self.riemann(*self.states())
         rhs = interior_f
         for p in range(g.np):
             for i in range(g.ilo, g.ihi+1):
-                rhs[p, i] += (-1)**p * boundary_f[p, i] - boundary_f[p, i+1]
-        
-        # Multiply by mass matrix, which is diagonal.
-        for p in range(g.np):
-            rhs[p, :] *= (2*p + 1) / 2
-        
-        return rhs
+                rhs[p, i] += (-1)**p * boundary_f[i] - boundary_f[i+1]
 
+        # Multiply by mass matrix (inverse), which is diagonal.
+        # Is it orthonormal?
+#        for p in range(g.np):
+#            rhs[p, :] *= (2*p + 1) / 2
+
+        return rhs
 
     def evolve(self, num_periods=1):
         """ evolve the linear advection equation using RK3 (SSP) """
@@ -216,7 +206,6 @@ class Simulation(object):
 
         # main evolution loop
         while self.t < tmax:
-
             # fill the boundary conditions
             g.fill_BCs()
 
@@ -243,22 +232,54 @@ class Simulation(object):
 
 if __name__ == "__main__":
 
-
-    #-------------------------------------------------------------------------
-    # compare limiting and no-limiting
+    # -------------------------------------------------------------------------
+    # DG of sine wave
 
     xmin = 0.0
     xmax = 1.0
-    nx = 500
+    nx = 4
     ng = 1
 
-    g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=5)
+    g3 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=3)
+    g7 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=7)
 
     u = 1.0
 
-    s = Simulation(g, u, C=0.5)
-    s.init_cond("sine")
-    ainit = s.grid.a.copy()
-    plot_x, plot_a = g.plotting_data()
+    # The CFL limit for DG is reduced by a factor 1/(2 p + 1)
+    s3 = Simulation(g3, u, C=0.8/(2*3+1))
+    s3.init_cond("sine")
+    s7 = Simulation(g7, u, C=0.8/(2*7+1))
+    s7.init_cond("sine")
+    # Plot the initial data to show how, difference in nodal locations as
+    # number of modes varies
+    plot_x3, plot_a3 = g3.plotting_data()
+    a3init = plot_a3.copy()
+    plot_x7, plot_a7 = g7.plotting_data()
+    a7init = plot_a7.copy()
+    pyplot.plot(plot_x3, plot_a3, 'bo', label=r"$p=3$")
+    pyplot.plot(plot_x7, plot_a7, 'r^', label=r"$p=7$")
+    pyplot.xlim(0, 1)
+    pyplot.xlabel(r'$x$')
+    pyplot.ylabel(r'$a$')
+    pyplot.legend()
+    pyplot.show()
 
-    pyplot.plot(plot_x, plot_a, 'kx')
+    s3.evolve(num_periods=1)
+    plot_x3, plot_a3 = g3.plotting_data()
+    pyplot.plot(plot_x3, plot_a3, 'bo', label=r"$p=3$")
+    pyplot.plot(plot_x3, a3init, 'r^', label=r"$p=3$, initial")
+    pyplot.xlim(0, 1)
+    pyplot.xlabel(r'$x$')
+    pyplot.ylabel(r'$a$')
+    pyplot.legend()
+    pyplot.show()
+
+    s7.evolve(num_periods=1)
+    plot_x7, plot_a7 = g7.plotting_data()
+    pyplot.plot(plot_x7, plot_a7, 'bo', label=r"$p=7$")
+    pyplot.plot(plot_x7, a7init, 'r^', label=r"$p=7$, initial")
+    pyplot.xlim(0, 1)
+    pyplot.xlabel(r'$x$')
+    pyplot.ylabel(r'$a$')
+    pyplot.legend()
+    pyplot.show()
