@@ -71,15 +71,17 @@ class Grid1d(object):
             self.all_nodes_per_node[:, i] = (self.x[i] +
                                              self.nodes * self.dx / 2)
 
-    def modal_to_nodal(self):
-        nodal = numpy.zeros_like(self.a)
-        for i in range(self.nx+2*self.ng):
-            nodal[:, i] = self.V @ self.a[:, i]
-        return nodal
+#    def modal_to_nodal(self):
+#        nodal = numpy.zeros_like(self.a)
+#        for i in range(self.nx+2*self.ng):
+#            nodal[:, i] = self.V @ self.a[:, i]
+#        return nodal
 
-    def nodal_to_modal(self, nodal):
+    def nodal_to_modal(self):
+        modal = numpy.zeros_like(self.a)
         for i in range(self.nx+2*self.ng):
-            self.a[:, i] = self.V_inv @ nodal[:, i]
+            modal[:, i] = self.V_inv @ self.a[:, i]
+        return modal
 
     def plotting_data(self):
         return (self.all_nodes,
@@ -153,6 +155,28 @@ class Simulation(object):
         for i in range(g.ilo, g.ihi+2):
             al[i] = g.a[-1, i-1]
             ar[i] = g.a[ 0, i  ]
+
+        # TODO: remove this return, fix the limiting.    
+        return al, ar
+    
+        # Limiting, using minmod (Hesthaven p 443-4)
+        theta = 2
+        a_modal = g.nodal_to_modal()
+        a_average = a_modal[0, :]
+        a_m = numpy.zeros_like(a_average)
+        a_m[1:] = a_average[:-1]
+        a_el = g.a[0 , :]
+        a_er = g.a[-1, :]
+        
+        check_left  = a_average - minmod([a_average - a_el,
+                                          a_average - a_m,
+                                          a_er - a_average])
+        check_right = a_average + minmod([a_average - a_el,
+                                          a_average - m,
+                                          a_er - a_average])
+        ids = numpy.logical_or(numpy.isclose(a_el, check_left),
+                               numpy.isclose(a_er, check_right))
+        
 
         return al, ar
 
@@ -229,7 +253,7 @@ if __name__ == "__main__":
 
     xmin = 0.0
     xmax = 1.0
-    nx = 16
+    nx = 64
     ng = 1
 
     g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=1)
@@ -240,11 +264,11 @@ if __name__ == "__main__":
 
     # The CFL limit for DG is reduced by a factor 1/(2 p + 1)
     s1 = Simulation(g1, u, C=0.8/(2*1+1))
-    s1.init_cond("sine")
     s3 = Simulation(g3, u, C=0.8/(2*3+1))
-    s3.init_cond("sine")
-    s7 = Simulation(g7, u, C=0.1/(2*7+1))  # Not sure what the critical CFL is
-    s7.init_cond("sine")
+    s7 = Simulation(g7, u, C=0.5/(2*7+1))  # Not sure what the critical CFL is
+    for s in [s1, s3, s7]:
+#        s.init_cond("sine")
+        s.init_cond("tophat")
     # Plot the initial data to show how, difference in nodal locations as
     # number of modes varies
     plot_x1, plot_a1 = g1.plotting_data()
