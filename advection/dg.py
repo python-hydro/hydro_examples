@@ -13,13 +13,13 @@ mpl.rcParams['mathtext.rm'] = 'serif'
 
 class Grid1d(object):
 
-    def __init__(self, nx, ng, xmin=0.0, xmax=1.0, np=3):
+    def __init__(self, nx, ng, xmin=0.0, xmax=1.0, m=3):
 
-        assert np > 0
+        assert m > 0
 
         self.ng = ng
         self.nx = nx
-        self.np = np
+        self.m = m
 
         self.xmin = xmin
         self.xmax = xmax
@@ -39,17 +39,17 @@ class Grid1d(object):
         # These are the modes of the solution at each point, so the
         # first index is the mode
         # NO! These are actually the *nodal* values
-        self.a = numpy.zeros((self.np+1, nx+2*ng), dtype=numpy.float64)
+        self.a = numpy.zeros((self.m+1, nx+2*ng), dtype=numpy.float64)
 
         # Need the Gauss-Lobatto nodes and weights in the reference element
-        GL = quadpy.line_segment.GaussLobatto(np+1)
+        GL = quadpy.line_segment.GaussLobatto(m+1)
         self.nodes = GL.points
         self.weights = GL.weights
         # To go from modal to nodal we need the Vandermonde matrix
-        self.V = numpy.polynomial.legendre.legvander(self.nodes, np)
-        c = numpy.eye(np+1)
+        self.V = numpy.polynomial.legendre.legvander(self.nodes, m)
+        c = numpy.eye(m+1)
         # Orthonormalize
-        for p in range(np+1):
+        for p in range(m+1):
             self.V[:, p] /= numpy.sqrt(2/(2*p+1))
             c[p, p] /= numpy.sqrt(2/(2*p+1))
         self.V_inv = numpy.linalg.inv(self.V)
@@ -63,10 +63,10 @@ class Grid1d(object):
         self.S = self.M @ self.D
 
         # Nodes in the computational coordinates
-        self.all_nodes = numpy.zeros((np+1)*(nx+2*ng), dtype=numpy.float64)
+        self.all_nodes = numpy.zeros((m+1)*(nx+2*ng), dtype=numpy.float64)
         self.all_nodes_per_node = numpy.zeros_like(self.a)
         for i in range(nx+2*ng):
-            self.all_nodes[(np+1)*i:(np+1)*(i+1)] = (self.x[i] +
+            self.all_nodes[(m+1)*i:(m+1)*(i+1)] = (self.x[i] +
                                                      self.nodes * self.dx / 2)
             self.all_nodes_per_node[:, i] = (self.x[i] +
                                              self.nodes * self.dx / 2)
@@ -89,7 +89,7 @@ class Grid1d(object):
 
     def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
-        return numpy.zeros((self.np+1, self.nx+2*self.ng), dtype=numpy.float64)
+        return numpy.zeros((self.m+1, self.nx+2*self.ng), dtype=numpy.float64)
 
     def fill_BCs(self):
         """ fill all single ghostcell with periodic boundary conditions """
@@ -101,12 +101,24 @@ class Grid1d(object):
             self.a[:, self.ihi+1+n] = self.a[:, self.ilo+n]
 
     def norm(self, e):
-        """ return the norm of quantity e which lives on the grid """
-        if len(e) != 2*self.ng + self.nx:
+        """ 
+        Return the norm of quantity e which lives on the grid.
+        
+        This is the 'broken norm': the quantity is integrated over each
+        individual element using Gauss-Lobatto quadrature (as we have those
+        nodes and weights), and the 2-norm of the result is then returned.
+        """
+        if not numpy.allclose(e.shape, self.all_nodes_per_node.shape):
             return None
 
-        # return numpy.sqrt(self.dx*numpy.sum(e[self.ilo:self.ihi+1]**2))
-        return numpy.max(abs(e[0, self.ilo:self.ihi+1]))
+
+        # This is L_inf norm...
+#        return numpy.max(abs(e[:, self.ilo:self.ihi+1]))
+        # This is actually a pointwise norm, not quadrature'd
+        return numpy.sqrt(self.dx*numpy.sum(e[:, self.ilo:self.ihi+1]**2))
+
+#        element_norm = self.weights @ e
+#        return numpy.sqrt(self.dx*numpy.sum(element_norm[self.ilo:self.ihi+1]**2))
 
 
 class Simulation(object):
@@ -256,19 +268,19 @@ if __name__ == "__main__":
     nx = 64
     ng = 1
 
-    g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=1)
-    g3 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=3)
-    g7 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, np=7)
+    g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=1)
+    g3 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=3)
+    g7 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=7)
 
     u = 1.0
 
-    # The CFL limit for DG is reduced by a factor 1/(2 p + 1)
+    # The CFL limit for DG is reduced by a factor 1/(2 m + 1)
     s1 = Simulation(g1, u, C=0.8/(2*1+1))
     s3 = Simulation(g3, u, C=0.8/(2*3+1))
     s7 = Simulation(g7, u, C=0.5/(2*7+1))  # Not sure what the critical CFL is
     for s in [s1, s3, s7]:
-#        s.init_cond("sine")
-        s.init_cond("tophat")
+        s.init_cond("sine")
+#        s.init_cond("tophat")
     # Plot the initial data to show how, difference in nodal locations as
     # number of modes varies
     plot_x1, plot_a1 = g1.plotting_data()
@@ -315,3 +327,32 @@ if __name__ == "__main__":
     pyplot.ylabel(r'$a$')
     pyplot.legend()
     pyplot.show()
+
+    # Note that the highest m (4) doesn't converge at the expected rate - 
+    # probably limited by the time integrator.
+    colors = "brckgy"
+    symbols = "xo^<sd"
+    ms = numpy.array(range(1, 5))
+    nxs = 2**numpy.array(range(3, 9))
+    errs = numpy.zeros((len(ms), len(nxs)))
+    for i, m in enumerate(ms):
+        for j, nx in enumerate(nxs):
+            g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
+            s = Simulation(g, u, C=0.5/(2*m+1))
+            s.init_cond("sine")
+            a_init = g.a.copy()
+            s.evolve(num_periods=1)
+            errs[i, j] = s.grid.norm(s.grid.a - a_init)
+        pyplot.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+                        label=fr'$m={{{m}}}$')
+    pyplot.plot(nxs, errs[0,0]/2*(nxs[0]/nxs)**2, 'b-',
+                label=r'$\propto (\Delta x)^2$')
+    pyplot.plot(nxs, errs[1,0]*2*(nxs[0]/nxs)**3, 'r-',
+                label=r'$\propto (\Delta x)^3$')
+    pyplot.plot(nxs, errs[2,0]*2*(nxs[0]/nxs)**4, 'c-',
+                label=r'$\propto (\Delta x)^4$')
+    pyplot.xlabel(r'$N$')
+    pyplot.ylabel(r'$\|$Error$\|_2$')
+    pyplot.legend()
+    pyplot.show()
+    
