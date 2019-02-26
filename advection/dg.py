@@ -6,6 +6,7 @@ import numpy
 from matplotlib import pyplot
 import matplotlib as mpl
 import quadpy
+from scipy.integrate import ode
 
 mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['mathtext.rm'] = 'serif'
@@ -257,6 +258,48 @@ class Simulation(object):
 
             self.t += dt
 
+    def evolve_scipy(self, num_periods=1):
+        """ evolve the linear advection equation using scipy """
+        self.t = 0.0
+        g = self.grid
+        
+        def rk_substep_scipy(t, y):
+            local_a = numpy.reshape(y, g.a.shape)
+            # Periodic BCs
+            local_a[:, :g.ng] = local_a[:, -2*g.ng:-g.ng]
+            local_a[:, -g.ng:] = local_a[:, g.ng:2*g.ng]
+            # Integrate flux over element
+            f = self.u * local_a
+            interior_f = g.S.T @ f
+            # Use Riemann solver to get fluxes between elements
+            al = numpy.zeros(g.nx+2*g.ng)
+            ar = numpy.zeros(g.nx+2*g.ng)
+            # i is looping over interfaces, so al is the right edge of the left
+            # element, etc.
+            for i in range(g.ilo, g.ihi+2):
+                al[i] = local_a[-1, i-1]
+                ar[i] = local_a[ 0, i  ]
+            boundary_f = self.riemann(al, ar)
+            rhs = interior_f
+            rhs[ 0, 1:-1] += boundary_f[1:-1]
+            rhs[-1, 1:-1] -= boundary_f[2:]
+    
+            # Multiply by mass matrix (inverse).
+            rhs_i = 2 / g.dx * g.M_inv @ rhs
+            
+            return numpy.ravel(rhs_i, order='C')
+
+        tmax = num_periods*self.period()
+        r = ode(rk_substep_scipy).set_integrator('dop853')
+        r.set_initial_value(numpy.ravel(g.a), 0)
+        dt = self.timestep()
+
+        # main evolution loop
+        while r.successful() and r.t < tmax:
+            dt = min(dt, tmax - r.t)
+            r.integrate(r.t+dt)
+        g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+    
 
 if __name__ == "__main__":
 
@@ -265,7 +308,7 @@ if __name__ == "__main__":
 
     xmin = 0.0
     xmax = 1.0
-    nx = 64
+    nx = 8
     ng = 1
 
     g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=1)
@@ -345,12 +388,41 @@ if __name__ == "__main__":
             errs[i, j] = s.grid.norm(s.grid.a - a_init)
         pyplot.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
                         label=fr'$m={{{m}}}$')
-    pyplot.plot(nxs, errs[0,0]/2*(nxs[0]/nxs)**2, 'b-',
-                label=r'$\propto (\Delta x)^2$')
-    pyplot.plot(nxs, errs[1,0]*2*(nxs[0]/nxs)**3, 'r-',
-                label=r'$\propto (\Delta x)^3$')
-    pyplot.plot(nxs, errs[2,0]*2*(nxs[0]/nxs)**4, 'c-',
-                label=r'$\propto (\Delta x)^4$')
+        if m < 4:
+            pyplot.plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+                        f'{colors[i]}--',
+                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+    pyplot.xlabel(r'$N$')
+    pyplot.ylabel(r'$\|$Error$\|_2$')
+    pyplot.legend()
+    pyplot.show()
+    
+    
+    # To check that it's a limitation of the time integrator, we can use
+    # the scipy DOPRI8 integrator
+    colors = "brckgy"
+    symbols = "xo^<sd"
+    ms = numpy.array(range(1, 6))
+    nxs = 2**numpy.array(range(3, 9))
+    errs = numpy.zeros((len(ms), len(nxs)))
+    for i, m in enumerate(ms):
+        for j, nx in enumerate(nxs):
+            g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
+            s = Simulation(g, u, C=0.5/(2*m+1))
+            s.init_cond("sine")
+            a_init = g.a.copy()
+            s.evolve_scipy(num_periods=1)
+            errs[i, j] = s.grid.norm(s.grid.a - a_init)
+        pyplot.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+                        label=fr'$m={{{m}}}$')
+        if m < 5:
+            pyplot.plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+                        f'{colors[i]}--',
+                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+        else:
+            pyplot.plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
+                        f'{colors[i]}--',
+                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
     pyplot.xlabel(r'$N$')
     pyplot.ylabel(r'$\|$Error$\|_2$')
     pyplot.legend()
