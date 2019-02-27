@@ -34,7 +34,7 @@ class Grid1d(object):
         self.dx = (xmax - xmin)/(nx)
         self.x = xmin + (numpy.arange(nx+2*ng)-ng+0.5)*self.dx
         self.xl = xmin + (numpy.arange(nx+2*ng)-ng)*self.dx
-        self.xr = xmin + (numpy.arange(nx+2*ng)+1.0)*self.dx
+        self.xr = xmin + (numpy.arange(nx+2*ng)-ng+1.0)*self.dx
 
         # storage for the solution
         # These are the modes of the solution at each point, so the
@@ -87,6 +87,21 @@ class Grid1d(object):
     def plotting_data(self):
         return (self.all_nodes,
                 self.a.ravel(order='F'))
+        
+    def plotting_data_high_order(self, npoints=50):
+        assert npoints > 2
+        p_nodes = numpy.zeros(npoints*(self.nx+2*self.ng), dtype=numpy.float64)
+        p_data = numpy.zeros_like(p_nodes)
+        for i in range(self.nx+2*self.ng):
+            p_nodes[npoints*i:npoints*(i+1)] = numpy.linspace(self.xl[i],
+                                                              self.xr[i],
+                                                              npoints)
+            modal = self.V_inv @ self.a[:, i]
+            for p in range(self.m+1):
+                modal[p] /= numpy.sqrt(2/(2*p+1))
+            scaled_x = 2 * (p_nodes[npoints*i:npoints*(i+1)] - self.x[i]) / self.dx
+            p_data[npoints*i:npoints*(i+1)] = numpy.polynomial.legendre.legval(scaled_x, modal)
+        return p_nodes, p_data
 
     def scratch_array(self):
         """ return a scratch array dimensioned for our grid """
@@ -145,7 +160,7 @@ class Simulation(object):
         elif type == "gaussian":
             def init_a(x):
                 local_xl = x - self.grid.dx/2
-                local_xr = x + 3*self.grid.dx/2
+                local_xr = x + self.grid.dx/2
                 al = 1.0 + numpy.exp(-60.0*(local_xl - 0.5)**2)
                 ar = 1.0 + numpy.exp(-60.0*(local_xr - 0.5)**2)
                 ac = 1.0 + numpy.exp(-60.0*(x - 0.5)**2)
@@ -313,72 +328,35 @@ class Simulation(object):
 if __name__ == "__main__":
 
     # -------------------------------------------------------------------------
-    # DG of sine wave
+    # Show the "grid" using a sine wave
 
     xmin = 0.0
     xmax = 1.0
     nx = 4
     ng = 1
 
-    g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=1)
-    g3 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=3)
-    g7 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=7)
-
     u = 1.0
 
-    # The CFL limit for DG is reduced by a factor 1/(2 m + 1)
-    s1 = Simulation(g1, u, C=0.8/(2*1+1))
-    s3 = Simulation(g3, u, C=0.8/(2*3+1))
-    s7 = Simulation(g7, u, C=0.5/(2*7+1))  # Not sure what the critical CFL is
-    for s in [s1, s3, s7]:
+    colors="kbr"
+    symbols="sox"
+    for m in range(1, 4):
+        g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
+        s = Simulation(g, u, C=0.5/(2*m+1))
         s.init_cond("sine")
-#        s.init_cond("tophat")
-    # Plot the initial data to show how, difference in nodal locations as
-    # number of modes varies
-    plot_x1, plot_a1 = g1.plotting_data()
-    a1init = plot_a1.copy()
-    plot_x3, plot_a3 = g3.plotting_data()
-    a3init = plot_a3.copy()
-    plot_x7, plot_a7 = g7.plotting_data()
-    a7init = plot_a7.copy()
-    pyplot.plot(plot_x1, plot_a1, 'k>', label=r"$p=1$")
-    pyplot.plot(plot_x3, plot_a3, 'bo', label=r"$p=3$")
-    pyplot.plot(plot_x7, plot_a7, 'r^', label=r"$p=7$")
+        plot_x, plot_a = g.plotting_data()
+        plot_x_hi, plot_a_hi = g.plotting_data_high_order()
+        pyplot.plot(plot_x, plot_a, f'{colors[m-1]}{symbols[m-1]}',
+                    label=fr"Nodes, $m={{{m}}}$")
+        pyplot.plot(plot_x_hi, plot_a_hi, f'{colors[m-1]}:',
+                    label=fr"Modes, $m={{{m}}}$")
     pyplot.xlim(0, 1)
+    pyplot.vlines([0.25, 0.5, 0.75], -2, 2, linestyles='--')
+    pyplot.ylim(-1, 1)
     pyplot.xlabel(r'$x$')
     pyplot.ylabel(r'$a$')
     pyplot.legend()
     pyplot.show()
 
-    s1.evolve(num_periods=1)
-    plot_x1, plot_a1 = g1.plotting_data()
-    pyplot.plot(plot_x1, plot_a1, 'k>', label=r"$p=1$")
-    pyplot.plot(plot_x1, a1init, 'r^', label=r"$p=1$, initial")
-    pyplot.xlim(0, 1)
-    pyplot.xlabel(r'$x$')
-    pyplot.ylabel(r'$a$')
-    pyplot.legend()
-    pyplot.show()
-
-    s3.evolve(num_periods=1)
-    plot_x3, plot_a3 = g3.plotting_data()
-    pyplot.plot(plot_x3, plot_a3, 'bo', label=r"$p=3$")
-    pyplot.plot(plot_x3, a3init, 'r^', label=r"$p=3$, initial")
-    pyplot.xlim(0, 1)
-    pyplot.xlabel(r'$x$')
-    pyplot.ylabel(r'$a$')
-    pyplot.legend()
-    pyplot.show()
-
-    s7.evolve(num_periods=1)
-    plot_x7, plot_a7 = g7.plotting_data()
-    pyplot.plot(plot_x7, plot_a7, 'bo', label=r"$p=7$")
-    pyplot.plot(plot_x7, a7init, 'r^', label=r"$p=7$, initial")
-    pyplot.xlim(0, 1)
-    pyplot.xlabel(r'$x$')
-    pyplot.ylabel(r'$a$')
-    pyplot.legend()
-    pyplot.show()
 
     # Note that the highest m (4) doesn't converge at the expected rate - 
     # probably limited by the time integrator.
