@@ -379,7 +379,7 @@ if __name__ == "__main__":
     
 #-------------- RK4    
     
-    problem = "sine"
+    problem = "gaussian"
 
     xmin = 0.0
     xmax = 1.0
@@ -400,7 +400,7 @@ if __name__ == "__main__":
             gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
             su = WENOSimulation(gu, u, C=0.5, weno_order=order)
         
-            su.init_cond("sine")
+            su.init_cond("gaussian")
             ainit = su.grid.a.copy()
         
             su.evolve(num_periods=5)
@@ -427,10 +427,10 @@ if __name__ == "__main__":
     pyplot.xlabel("N")
     pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                fontsize=16)
-    pyplot.title("Convergence of sine wave, RK4")
+    pyplot.title("Convergence of Gaussian, RK4")
 
     pyplot.legend(frameon=False)
-    pyplot.savefig("weno-converge-sine-rk4.pdf")
+    pyplot.savefig("weno-converge-gaussian-rk4.pdf")
 #    pyplot.show()
     
 #-------------- Sine wave, 8th order time integrator    
