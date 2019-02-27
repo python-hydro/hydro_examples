@@ -379,7 +379,7 @@ if __name__ == "__main__":
     
 #-------------- RK4    
     
-    problem = "gaussian"
+    problem = "sine"
 
     xmin = 0.0
     xmax = 1.0
@@ -400,7 +400,7 @@ if __name__ == "__main__":
             gu = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
             su = WENOSimulation(gu, u, C=0.5, weno_order=order)
         
-            su.init_cond("gaussian")
+            su.init_cond("sine")
             ainit = su.grid.a.copy()
         
             su.evolve(num_periods=5)
@@ -427,19 +427,19 @@ if __name__ == "__main__":
     pyplot.xlabel("N")
     pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                fontsize=16)
-    pyplot.title("Convergence of Gaussian, RK4")
+    pyplot.title("Convergence of sine wave, RK4")
 
     pyplot.legend(frameon=False)
-    pyplot.savefig("weno-converge-gaussian-rk4.pdf")
+    pyplot.savefig("weno-converge-sine-rk4.pdf")
 #    pyplot.show()
     
-#-------------- Gaussian    
+#-------------- Sine wave, 8th order time integrator    
     
-    problem = "gaussian"
+    problem = "sine"
 
     xmin = 0.0
     xmax = 1.0
-    orders = [3, 4, 5, 6]
+    orders = [3, 5, 7]
     N = [24, 32, 54, 64, 81, 108, 128]
 #    N = [32, 64, 108, 128]
 
@@ -461,8 +461,8 @@ if __name__ == "__main__":
 #            guM = advection.Grid1d(nx, ng, xmin=xmin, xmax=xmax)
 #            suM = WENOMSimulation(guM, u, C=0.5, weno_order=order)
         
-            su.init_cond("gaussian")
-#            suM.init_cond("gaussian")
+            su.init_cond("sine")
+#            suM.init_cond("sine")
             ainit = su.grid.a.copy()
         
             su.evolve_scipy(num_periods=1)
@@ -480,9 +480,9 @@ if __name__ == "__main__":
 #        pyplot.scatter(N, errsM[n_order],
 #                       color=colors[n_order],
 #                       label=r"WENOM, $r={}$".format(order))
-        pyplot.plot(N, errs[n_order][0]*(N[0]/N)**(2*order-2),
+        pyplot.plot(N, errs[n_order][0]*(N[0]/N)**(2*order-1),
                     linestyle="--", color=colors[n_order],
-                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-2))
+                    label=r"$\mathcal{{O}}(\Delta x^{{{}}})$".format(2*order-1))
 #    pyplot.plot(N, errs[n_order][len(N)-1]*(N[len(N)-1]/N)**4,
 #                color="k", label=r"$\mathcal{O}(\Delta x^4)$")
 
@@ -494,9 +494,10 @@ if __name__ == "__main__":
     pyplot.xlabel("N")
     pyplot.ylabel(r"$\| a^\mathrm{final} - a^\mathrm{init} \|_2$",
                fontsize=16)
-    pyplot.title("Convergence of Gaussian, DOPRK8")
+    pyplot.title("Convergence of sine wave, DOPRK8")
 
-    pyplot.legend(frameon=False)
-    pyplot.savefig("weno-converge-gaussian.pdf")
+    lgd = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    pyplot.savefig("weno-converge-sine.pdf", 
+                   bbox_extra_artists=(lgd,), bbox_inches='tight')
 #    pyplot.show()
     
