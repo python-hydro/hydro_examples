@@ -405,7 +405,7 @@ if __name__ == "__main__":
         
             su.evolve(num_periods=5)
         
-            errs[-1].append(gu.norm(gu.a - ainit))
+            errs[-1].append(gu.norm(gu.a - ainit, norm=2))
     
     pyplot.clf()
     N = numpy.array(N, dtype=numpy.float64)
@@ -468,8 +468,8 @@ if __name__ == "__main__":
             su.evolve_scipy(num_periods=1)
 #            suM.evolve_scipy(num_periods=1)
         
-            errs[-1].append(gu.norm(gu.a - ainit))
-#            errsM[-1].append(guM.norm(guM.a - ainit))
+            errs[-1].append(gu.norm(gu.a - ainit, norm=2))
+#            errsM[-1].append(guM.norm(guM.a - ainit, norm=2))
     
     pyplot.clf()
     N = numpy.array(N, dtype=numpy.float64)
