@@ -138,11 +138,20 @@ class Simulation(object):
                                                      x <= 0.666),
                                    numpy.ones_like(x),
                                    numpy.zeros_like(x))
-
         elif type == "sine":
             def init_a(x):
                 return numpy.sin(2.0 * numpy.pi * x /
                                  (self.grid.xmax - self.grid.xmin))
+        elif type == "gaussian":
+            def init_a(x):
+                local_xl = x - self.grid.dx/2
+                local_xr = x + 3*self.grid.dx/2
+                al = 1.0 + numpy.exp(-60.0*(local_xl - 0.5)**2)
+                ar = 1.0 + numpy.exp(-60.0*(local_xr - 0.5)**2)
+                ac = 1.0 + numpy.exp(-60.0*(x - 0.5)**2)
+                
+                return (1./6.)*(al + 4*ac + ar)
+
 
         self.grid.a = init_a(self.grid.all_nodes_per_node)
 
@@ -308,7 +317,7 @@ if __name__ == "__main__":
 
     xmin = 0.0
     xmax = 1.0
-    nx = 8
+    nx = 4
     ng = 1
 
     g1 = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=1)
@@ -375,6 +384,7 @@ if __name__ == "__main__":
     # probably limited by the time integrator.
     colors = "brckgy"
     symbols = "xo^<sd"
+    fig, axes = pyplot.subplots(1, 2)
     ms = numpy.array(range(1, 5))
     nxs = 2**numpy.array(range(3, 9))
     errs = numpy.zeros((len(ms), len(nxs)))
@@ -383,23 +393,21 @@ if __name__ == "__main__":
             g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
             s = Simulation(g, u, C=0.5/(2*m+1))
             s.init_cond("sine")
+#            s.init_cond("gaussian")
             a_init = g.a.copy()
             s.evolve(num_periods=1)
             errs[i, j] = s.grid.norm(s.grid.a - a_init)
-        pyplot.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
-                        label=fr'$m={{{m}}}$')
+        axes[0].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}')
         if m < 4:
-            pyplot.plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
-                        f'{colors[i]}--',
-                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
-    pyplot.xlabel(r'$N$')
-    pyplot.ylabel(r'$\|$Error$\|_2$')
-    pyplot.legend()
-    pyplot.show()
+            axes[0].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+                        f'{colors[i]}--')
+    axes[0].set_xlabel(r'$N$')
+    axes[0].set_ylabel(r'$\|$Error$\|_2$')
+    axes[0].set_title('RK4')
     
     
     # To check that it's a limitation of the time integrator, we can use
-    # the scipy DOPRI8 integrator
+    # the scipy DOPRK8 integrator
     colors = "brckgy"
     symbols = "xo^<sd"
     ms = numpy.array(range(1, 6))
@@ -407,24 +415,30 @@ if __name__ == "__main__":
     errs = numpy.zeros((len(ms), len(nxs)))
     for i, m in enumerate(ms):
         for j, nx in enumerate(nxs):
+            print(f"DOPRK8, m={m}, nx={nx}")
             g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
             s = Simulation(g, u, C=0.5/(2*m+1))
             s.init_cond("sine")
+#            s.init_cond("gaussian")
             a_init = g.a.copy()
             s.evolve_scipy(num_periods=1)
             errs[i, j] = s.grid.norm(s.grid.a - a_init)
-        pyplot.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
-                        label=fr'$m={{{m}}}$')
+        axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+                       label=fr'$m={{{m}}}$')
         if m < 5:
-            pyplot.plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
-                        f'{colors[i]}--',
-                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+            axes[1].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            pyplot.plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
-                        f'{colors[i]}--',
-                        label=fr'$\propto (\Delta x)^{{{m+1}}}$')
-    pyplot.xlabel(r'$N$')
-    pyplot.ylabel(r'$\|$Error$\|_2$')
-    pyplot.legend()
+            axes[1].plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+    axes[1].set_xlabel(r'$N$')
+    axes[1].set_ylabel(r'$\|$Error$\|_2$')
+    axes[1].set_title('DOPRK8')
+    fig.tight_layout()
+    lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    fig.savefig('dg_convergence_sine.pdf', 
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
     
