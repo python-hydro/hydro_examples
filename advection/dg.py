@@ -72,11 +72,10 @@ class Grid1d(object):
             self.all_nodes_per_node[:, i] = (self.x[i] +
                                              self.nodes * self.dx / 2)
 
-#    def modal_to_nodal(self):
-#        nodal = numpy.zeros_like(self.a)
-#        for i in range(self.nx+2*self.ng):
-#            nodal[:, i] = self.V @ self.a[:, i]
-#        return nodal
+    def modal_to_nodal(self, modal):
+        for i in range(self.nx+2*self.ng):
+            self.a[:, i] = self.V @ modal[:, i]
+        return self.a
 
     def nodal_to_modal(self):
         modal = numpy.zeros_like(self.a)
@@ -137,13 +136,30 @@ class Grid1d(object):
 #        return numpy.sqrt(self.dx*numpy.sum(element_norm[self.ilo:self.ihi+1]**2))
 
 
+def minmod3(a1, a2, a3):
+    """
+    Utility function that does minmod on three inputs
+    """
+    signs1 = a1 * a2
+    signs2 = a1 * a3
+    signs3 = a2 * a3
+    same_sign = numpy.logical_and(numpy.logical_and(signs1 > 0,
+                                                    signs2 > 0),
+                                  signs3 > 0)
+    minmod = numpy.min(numpy.abs(numpy.vstack((a1, a2, a3))),
+                       axis=0) * numpy.sign(a1)
+    
+    return numpy.where(same_sign, minmod, numpy.zeros_like(a1))
+
+
 class Simulation(object):
 
-    def __init__(self, grid, u, C=0.8):
+    def __init__(self, grid, u, C=0.8, limiter=None):
         self.grid = grid
         self.t = 0.0  # simulation time
         self.u = u    # the constant advective velocity
         self.C = C    # CFL number
+        self.limiter = limiter  # What it says.
 
     def init_cond(self, type="sine"):
         """ initialize the data """
@@ -184,6 +200,8 @@ class Simulation(object):
         # Evaluate the nodal values at the domain edges
         g = self.grid
 
+        # Extract nodal values
+        
         al = numpy.zeros(g.nx+2*g.ng)
         ar = numpy.zeros(g.nx+2*g.ng)
 
@@ -193,30 +211,70 @@ class Simulation(object):
             al[i] = g.a[-1, i-1]
             ar[i] = g.a[ 0, i  ]
 
-        # TODO: remove this return, fix the limiting.    
         return al, ar
     
-        # Limiting, using minmod (Hesthaven p 443-4)
-        theta = 2
-        a_modal = g.nodal_to_modal()
-        a_average = a_modal[0, :]
-        a_m = numpy.zeros_like(a_average)
-        a_m[1:] = a_average[:-1]
-        a_el = g.a[0 , :]
-        a_er = g.a[-1, :]
-        
-        check_left  = a_average - minmod([a_average - a_el,
-                                          a_average - a_m,
-                                          a_er - a_average])
-        check_right = a_average + minmod([a_average - a_el,
-                                          a_average - m,
-                                          a_er - a_average])
-        ids = numpy.logical_or(numpy.isclose(a_el, check_left),
-                               numpy.isclose(a_er, check_right))
-        
+    def limit(self):
+        """
+        After evolution, limit the slopes.
+        """
 
-        return al, ar
+        # Evaluate the nodal values at the domain edges
+        g = self.grid
 
+        # Limiting!
+        
+        if self.limiter == "moment":
+        
+            # Limiting, using moment limiting (Hesthaven p 445-7)
+            theta = 2
+            a_modal = g.nodal_to_modal()
+            # First, work out where limiting is needed
+            limiting_todo = numpy.ones(g.nx+2*g.ng, dtype=bool)
+            limiting_todo[:g.ng] = False
+            limiting_todo[-g.ng:] = False
+            # Get the cell average and the nodal values at the boundaries
+            a_zeromode = a_modal.copy()
+            a_zeromode[1:, :] = 0
+            a_cell = (g.V @ a_zeromode)[0,:]
+            a_minus = g.a[0, :]
+            a_plus = g.a[-1, :]
+            # From the cell averages and boundary values we can construct 
+            # alternate values at the boundaries
+            a_left = numpy.zeros(g.nx+2*g.ng)
+            a_right = numpy.zeros(g.nx+2*g.ng)
+            a_left[1:-1] = a_cell[1:-1] - minmod3(a_cell[1:-1] - a_minus[1:-1],
+                                                 a_cell[1:-1] - a_cell[:-2],
+                                                 a_cell[2:] - a_cell[1:-1])
+            a_right[1:-1] = a_cell[1:-1] + minmod3(a_plus[1:-1] - a_cell[1:-1],
+                                                  a_cell[1:-1] - a_cell[:-2],
+                                                  a_cell[2:] - a_cell[1:-1])
+            limiting_todo[1:-1] = numpy.logical_not(
+                    numpy.logical_and(numpy.isclose(a_left[1:-1],
+                                                    a_minus[1:-1]),
+                                      numpy.isclose(a_right[1:-1],
+                                                    a_plus[1:-1])))
+            # Now, do the limiting. Modify moments where needed, and as soon as
+            # limiting isn't needed, stop
+            updated_mode = numpy.zeros(g.nx+2*g.ng)
+            for i in range(g.m-1, -1, -1):
+                factor = numpy.sqrt((2*i+3)*(2*i+5))
+                a1 = factor * a_modal[i+1, 1:-1]
+                a2 = theta * (a_modal[i, 2:] - a_modal[i, 1:-1])
+                a3 = theta * (a_modal[i, 1:-1] - a_modal[i, :-2])
+                updated_mode[1:-1] = minmod3(a1, a2, a3) / factor
+#                print("Original", i, a_modal[i+1, :])
+#                print("Updated", i, updated_mode)
+                did_it_limit = numpy.isclose(a_modal[i+1, 1:-1],
+                                             updated_mode[1:-1])
+                a_modal[i+1, limiting_todo] = updated_mode[limiting_todo]
+#                print("Limited", i, a_modal[i+1, :])
+                limiting_todo[1:-1] = numpy.logical_and(limiting_todo[1:-1],
+                                                        did_it_limit)
+            # Get back nodal values
+            g.a = g.modal_to_nodal(a_modal)
+            
+        return None
+            
     def riemann(self, al, ar):
         """
         Riemann problem for advection -- this is simply upwinding,
@@ -273,12 +331,15 @@ class Simulation(object):
             a_start = g.a.copy()
             k1 = dt * self.rk_substep()
             g.a = a_start + k1
+            self.limit()
             a1 = g.a.copy()
             k2 = dt * self.rk_substep()
             g.a = (3 * a_start + a1 + k2) / 4
+            self.limit()
             a2 = g.a.copy()
             k3 = dt * self.rk_substep()
             g.a = (a_start + 2 * a2 + 2 * k3) / 3
+            self.limit()
 
             self.t += dt
 
@@ -322,11 +383,52 @@ class Simulation(object):
         while r.successful() and r.t < tmax:
             dt = min(dt, tmax - r.t)
             r.integrate(r.t+dt)
-        g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+            g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+            self.limit()
+            r.y = numpy.ravel(g.a)
     
 
 if __name__ == "__main__":
 
+    # Checking the limiter
+    g = Grid1d(16, 1, 0, 1, 3)
+    s = Simulation(g, 1, 0.5/7, "moment")
+    s.init_cond("sine")
+    s.limit()
+    
+    
+    # Runs with limiter
+    g_sin_nolimit = Grid1d(16, 1, 0, 1, 3)
+    g_hat_nolimit = Grid1d(16, 1, 0, 1, 3)
+    g_sin_moment = Grid1d(16, 1, 0, 1, 3)
+    g_hat_moment = Grid1d(16, 1, 0, 1, 3)
+    s_sin_nolimit = Simulation(g_sin_nolimit, 1, 0.5/7, limiter=None)
+    s_hat_nolimit = Simulation(g_hat_nolimit, 1, 0.5/7, limiter=None)
+    s_sin_moment = Simulation(g_sin_moment, 1, 0.5/7, limiter="moment")
+    s_hat_moment = Simulation(g_hat_moment, 1, 0.5/7, limiter="moment")
+    for s in s_sin_nolimit, s_sin_moment:
+        s.init_cond("sine")
+    for s in s_hat_nolimit, s_hat_moment:
+        s.init_cond("tophat")
+    for s in s_sin_nolimit, s_sin_moment, s_hat_nolimit, s_hat_moment:
+        s.evolve()
+    fig, axes = pyplot.subplots(2, 2)
+    for i, g in enumerate((g_sin_nolimit, g_hat_nolimit)):
+        plot_x, plot_a = g.plotting_data()
+        axes[0, i].plot(plot_x, plot_a)
+        axes[0, i].set_xlim(0, 1)
+        axes[0, i].set_xlabel(r"$x$")
+        axes[0, i].set_ylabel(r"$a$")
+    for i, g in enumerate((g_sin_moment, g_hat_moment)):
+        plot_x, plot_a = g.plotting_data()
+        axes[1, i].plot(plot_x, plot_a)
+        axes[1, i].set_xlim(0, 1)
+        axes[1, i].set_xlabel(r"$x$")
+        axes[1, i].set_ylabel(r"$a$")
+    fig.tight_layout()
+    pyplot.show()
+    1/0
+    
     # -------------------------------------------------------------------------
     # Show the "grid" using a sine wave
 
