@@ -269,11 +269,11 @@ class Simulation(object):
                 a_modal[i+1, limiting_todo] = updated_mode[limiting_todo]
 #                print("Limited", i, a_modal[i+1, :])
                 limiting_todo[1:-1] = numpy.logical_and(limiting_todo[1:-1],
-                                                        did_it_limit)
+                             numpy.logical_not(did_it_limit))
             # Get back nodal values
             g.a = g.modal_to_nodal(a_modal)
             
-        return None
+        return g.a
             
     def riemann(self, al, ar):
         """
@@ -331,15 +331,15 @@ class Simulation(object):
             a_start = g.a.copy()
             k1 = dt * self.rk_substep()
             g.a = a_start + k1
-            self.limit()
+            g.a = self.limit()
             a1 = g.a.copy()
             k2 = dt * self.rk_substep()
             g.a = (3 * a_start + a1 + k2) / 4
-            self.limit()
+            g.a = self.limit()
             a2 = g.a.copy()
             k3 = dt * self.rk_substep()
             g.a = (a_start + 2 * a2 + 2 * k3) / 3
-            self.limit()
+            g.a = self.limit()
 
             self.t += dt
 
@@ -390,13 +390,6 @@ class Simulation(object):
 
 if __name__ == "__main__":
 
-    # Checking the limiter
-    g = Grid1d(16, 1, 0, 1, 3)
-    s = Simulation(g, 1, 0.5/7, "moment")
-    s.init_cond("sine")
-    s.limit()
-    
-    
     # Runs with limiter
     g_sin_nolimit = Grid1d(16, 1, 0, 1, 3)
     g_hat_nolimit = Grid1d(16, 1, 0, 1, 3)
@@ -410,24 +403,28 @@ if __name__ == "__main__":
         s.init_cond("sine")
     for s in s_hat_nolimit, s_hat_moment:
         s.init_cond("tophat")
+    x_sin_start, a_sin_start = g_sin_nolimit.plotting_data()
+    x_hat_start, a_hat_start = g_hat_nolimit.plotting_data()
     for s in s_sin_nolimit, s_sin_moment, s_hat_nolimit, s_hat_moment:
         s.evolve()
-    fig, axes = pyplot.subplots(2, 2)
+    fig, axes = pyplot.subplots(1, 2)
+    axes[0].plot(x_sin_start, a_sin_start, 'k-', label='Exact')
+    axes[1].plot(x_hat_start, a_hat_start, 'k-', label='Exact')
     for i, g in enumerate((g_sin_nolimit, g_hat_nolimit)):
-        plot_x, plot_a = g.plotting_data()
-        axes[0, i].plot(plot_x, plot_a)
-        axes[0, i].set_xlim(0, 1)
-        axes[0, i].set_xlabel(r"$x$")
-        axes[0, i].set_ylabel(r"$a$")
+        axes[i].plot(*g.plotting_data(), 'b--', label='No limiting')
+        axes[i].set_xlim(0, 1)
+        axes[i].set_xlabel(r"$x$")
+        axes[i].set_ylabel(r"$a$")
     for i, g in enumerate((g_sin_moment, g_hat_moment)):
-        plot_x, plot_a = g.plotting_data()
-        axes[1, i].plot(plot_x, plot_a)
-        axes[1, i].set_xlim(0, 1)
-        axes[1, i].set_xlabel(r"$x$")
-        axes[1, i].set_ylabel(r"$a$")
+        axes[i].plot(*g.plotting_data(), 'r:', label='Moment limiting')
+        axes[i].set_xlim(0, 1)
+        axes[i].set_xlabel(r"$x$")
+        axes[i].set_ylabel(r"$a$")
     fig.tight_layout()
+    lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+#    fig.savefig('dg_limiter.pdf', 
+#                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
-    1/0
     
     # -------------------------------------------------------------------------
     # Show the "grid" using a sine wave
@@ -520,5 +517,41 @@ if __name__ == "__main__":
     lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     fig.savefig('dg_convergence_sine.pdf', 
                 bbox_extra_artists=(lgd,), bbox_inches='tight')
+    pyplot.show()
+    
+    
+    
+    # Check convergence with the limiter on
+    colors = "brckgy"
+    symbols = "xo^<sd"
+    ms = numpy.array(range(1, 6))
+    nxs = 2**numpy.array(range(3, 9))
+    errs = numpy.zeros((len(ms), len(nxs)))
+    for i, m in enumerate(ms):
+        for j, nx in enumerate(nxs):
+            print(f"DOPRK8, m={m}, nx={nx}")
+            g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
+            s = Simulation(g, u, C=0.5/(2*m+1), limiter="moment")
+            s.init_cond("sine")
+            a_init = g.a.copy()
+            s.evolve_scipy(num_periods=1)
+            errs[i, j] = s.grid.norm(s.grid.a - a_init)
+        axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+                       label=fr'$m={{{m}}}$')
+        if m < 5:
+            axes[1].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+        else:
+            axes[1].plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+    axes[1].set_xlabel(r'$N$')
+    axes[1].set_ylabel(r'$\|$Error$\|_2$')
+    axes[1].set_title('DOPRK8')
+    fig.tight_layout()
+    lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+#    fig.savefig('dg_convergence_sine_limiter.pdf', 
+#                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
     
