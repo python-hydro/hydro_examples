@@ -367,16 +367,24 @@ class Simulation(object):
             return numpy.ravel(rhs_i, order='C')
 
         tmax = num_periods*self.period()
-        r = ode(rk_substep_scipy).set_integrator('dop853')
-        r.set_initial_value(numpy.ravel(g.a), 0)
-        dt = self.timestep()
 
         # main evolution loop
-        while r.successful() and r.t < tmax:
-            dt = min(dt, tmax - r.t)
+        while self.t < tmax:
+            # fill the boundary conditions
+            g.fill_BCs()
+
+            # get the timestep
+            dt = self.timestep()
+
+            if self.t + dt > tmax:
+                dt = tmax - self.t
+
+            r = ode(rk_substep_scipy).set_integrator('dop853')
+            r.set_initial_value(numpy.ravel(g.a), self.t)
             r.integrate(r.t+dt)
-        g.a[:, :] = numpy.reshape(r.y, g.a.shape)
-        self.limit()
+            g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+            g.a = self.limit()
+            self.t += dt
 
 
 if __name__ == "__main__":
@@ -511,6 +519,7 @@ if __name__ == "__main__":
     # Check convergence with the limiter on
     colors = "brckgy"
     symbols = "xo^<sd"
+    fig, ax = pyplot.subplots(1, 1)
     ms = numpy.array(range(1, 6))
     nxs = 2**numpy.array(range(3, 9))
     errs = numpy.zeros((len(ms), len(nxs)))
@@ -523,21 +532,21 @@ if __name__ == "__main__":
             a_init = g.a.copy()
             s.evolve_scipy(num_periods=1)
             errs[i, j] = s.grid.norm(s.grid.a - a_init)
-        axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
-                       label=fr'$m={{{m}}}$')
+        ax.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+                  label=fr'$m={{{m}}}$')
         if m < 5:
-            axes[1].plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
-                         f'{colors[i]}--',
-                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+            ax.plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
+                    f'{colors[i]}--',
+                    label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            axes[1].plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
-                         f'{colors[i]}--',
-                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
-    axes[1].set_xlabel(r'$N$')
-    axes[1].set_ylabel(r'$\|$Error$\|_2$')
-    axes[1].set_title('DOPRK8')
+            ax.plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
+                    f'{colors[i]}--',
+                    label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+    ax.set_xlabel(r'$N$')
+    ax.set_ylabel(r'$\|$Error$\|_2$')
+    ax.set_title('DOPRK8, Moment limiter')
     fig.tight_layout()
-    lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    lgd = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 #    fig.savefig('dg_convergence_sine_limiter.pdf',
 #                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
