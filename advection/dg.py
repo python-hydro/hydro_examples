@@ -3,6 +3,7 @@ Discontinuous Galerkin for the advection equation.
 """
 
 import numpy
+from numpy.polynomial import legendre
 from matplotlib import pyplot
 import matplotlib as mpl
 import quadpy
@@ -47,7 +48,7 @@ class Grid1d(object):
         self.nodes = GL.points
         self.weights = GL.weights
         # To go from modal to nodal we need the Vandermonde matrix
-        self.V = numpy.polynomial.legendre.legvander(self.nodes, m)
+        self.V = legendre.legvander(self.nodes, m)
         c = numpy.eye(m+1)
         # Orthonormalize
         for p in range(m+1):
@@ -57,8 +58,8 @@ class Grid1d(object):
         self.M = numpy.linalg.inv(self.V @ self.V.T)
         self.M_inv = self.V @ self.V.T
         # Derivatives of Legendre polynomials lead to derivatives of V
-        dV = numpy.polynomial.legendre.legval(self.nodes,
-                                              numpy.polynomial.legendre.legder(c)).T
+        dV = legendre.legval(self.nodes,
+                             legendre.legder(c)).T
         self.D = dV @ self.V_inv
         # Stiffness matrix for the interior flux
         self.S = self.M @ self.D
@@ -68,7 +69,7 @@ class Grid1d(object):
         self.all_nodes_per_node = numpy.zeros_like(self.a)
         for i in range(nx+2*ng):
             self.all_nodes[(m+1)*i:(m+1)*(i+1)] = (self.x[i] +
-                                                     self.nodes * self.dx / 2)
+                                                   self.nodes * self.dx / 2)
             self.all_nodes_per_node[:, i] = (self.x[i] +
                                              self.nodes * self.dx / 2)
 
@@ -86,7 +87,7 @@ class Grid1d(object):
     def plotting_data(self):
         return (self.all_nodes,
                 self.a.ravel(order='F'))
-        
+
     def plotting_data_high_order(self, npoints=50):
         assert npoints > 2
         p_nodes = numpy.zeros(npoints*(self.nx+2*self.ng), dtype=numpy.float64)
@@ -98,8 +99,9 @@ class Grid1d(object):
             modal = self.V_inv @ self.a[:, i]
             for p in range(self.m+1):
                 modal[p] /= numpy.sqrt(2/(2*p+1))
-            scaled_x = 2 * (p_nodes[npoints*i:npoints*(i+1)] - self.x[i]) / self.dx
-            p_data[npoints*i:npoints*(i+1)] = numpy.polynomial.legendre.legval(scaled_x, modal)
+            scaled_x = 2 * (p_nodes[npoints*i:npoints*(i+1)] -
+                            self.x[i]) / self.dx
+            p_data[npoints*i:npoints*(i+1)] = legendre.legval(scaled_x, modal)
         return p_nodes, p_data
 
     def scratch_array(self):
@@ -116,9 +118,9 @@ class Grid1d(object):
             self.a[:, self.ihi+1+n] = self.a[:, self.ilo+n]
 
     def norm(self, e):
-        """ 
+        """
         Return the norm of quantity e which lives on the grid.
-        
+
         This is the 'broken norm': the quantity is integrated over each
         individual element using Gauss-Lobatto quadrature (as we have those
         nodes and weights), and the 2-norm of the result is then returned.
@@ -126,14 +128,8 @@ class Grid1d(object):
         if not numpy.allclose(e.shape, self.all_nodes_per_node.shape):
             return None
 
-
-        # This is L_inf norm...
-#        return numpy.max(abs(e[:, self.ilo:self.ihi+1]))
         # This is actually a pointwise norm, not quadrature'd
         return numpy.sqrt(self.dx*numpy.sum(e[:, self.ilo:self.ihi+1]**2))
-
-#        element_norm = self.weights @ e
-#        return numpy.sqrt(self.dx*numpy.sum(element_norm[self.ilo:self.ihi+1]**2))
 
 
 def minmod3(a1, a2, a3):
@@ -148,7 +144,7 @@ def minmod3(a1, a2, a3):
                                   signs3 > 0)
     minmod = numpy.min(numpy.abs(numpy.vstack((a1, a2, a3))),
                        axis=0) * numpy.sign(a1)
-    
+
     return numpy.where(same_sign, minmod, numpy.zeros_like(a1))
 
 
@@ -180,9 +176,8 @@ class Simulation(object):
                 al = 1.0 + numpy.exp(-60.0*(local_xl - 0.5)**2)
                 ar = 1.0 + numpy.exp(-60.0*(local_xr - 0.5)**2)
                 ac = 1.0 + numpy.exp(-60.0*(x - 0.5)**2)
-                
-                return (1./6.)*(al + 4*ac + ar)
 
+                return (1./6.)*(al + 4*ac + ar)
 
         self.grid.a = init_a(self.grid.all_nodes_per_node)
 
@@ -201,7 +196,7 @@ class Simulation(object):
         g = self.grid
 
         # Extract nodal values
-        
+
         al = numpy.zeros(g.nx+2*g.ng)
         ar = numpy.zeros(g.nx+2*g.ng)
 
@@ -209,10 +204,10 @@ class Simulation(object):
         # element, etc.
         for i in range(g.ilo, g.ihi+2):
             al[i] = g.a[-1, i-1]
-            ar[i] = g.a[ 0, i  ]
+            ar[i] = g.a[0, i]
 
         return al, ar
-    
+
     def limit(self):
         """
         After evolution, limit the slopes.
@@ -222,9 +217,9 @@ class Simulation(object):
         g = self.grid
 
         # Limiting!
-        
+
         if self.limiter == "moment":
-        
+
             # Limiting, using moment limiting (Hesthaven p 445-7)
             theta = 2
             a_modal = g.nodal_to_modal()
@@ -235,19 +230,19 @@ class Simulation(object):
             # Get the cell average and the nodal values at the boundaries
             a_zeromode = a_modal.copy()
             a_zeromode[1:, :] = 0
-            a_cell = (g.V @ a_zeromode)[0,:]
+            a_cell = (g.V @ a_zeromode)[0, :]
             a_minus = g.a[0, :]
             a_plus = g.a[-1, :]
-            # From the cell averages and boundary values we can construct 
+            # From the cell averages and boundary values we can construct
             # alternate values at the boundaries
             a_left = numpy.zeros(g.nx+2*g.ng)
             a_right = numpy.zeros(g.nx+2*g.ng)
             a_left[1:-1] = a_cell[1:-1] - minmod3(a_cell[1:-1] - a_minus[1:-1],
-                                                 a_cell[1:-1] - a_cell[:-2],
-                                                 a_cell[2:] - a_cell[1:-1])
-            a_right[1:-1] = a_cell[1:-1] + minmod3(a_plus[1:-1] - a_cell[1:-1],
                                                   a_cell[1:-1] - a_cell[:-2],
                                                   a_cell[2:] - a_cell[1:-1])
+            a_right[1:-1] = a_cell[1:-1] + minmod3(a_plus[1:-1] - a_cell[1:-1],
+                                                   a_cell[1:-1] - a_cell[:-2],
+                                                   a_cell[2:] - a_cell[1:-1])
             limiting_todo[1:-1] = numpy.logical_not(
                     numpy.logical_and(numpy.isclose(a_left[1:-1],
                                                     a_minus[1:-1]),
@@ -262,19 +257,16 @@ class Simulation(object):
                 a2 = theta * (a_modal[i, 2:] - a_modal[i, 1:-1])
                 a3 = theta * (a_modal[i, 1:-1] - a_modal[i, :-2])
                 updated_mode[1:-1] = minmod3(a1, a2, a3) / factor
-#                print("Original", i, a_modal[i+1, :])
-#                print("Updated", i, updated_mode)
                 did_it_limit = numpy.isclose(a_modal[i+1, 1:-1],
                                              updated_mode[1:-1])
                 a_modal[i+1, limiting_todo] = updated_mode[limiting_todo]
-#                print("Limited", i, a_modal[i+1, :])
                 limiting_todo[1:-1] = numpy.logical_and(limiting_todo[1:-1],
-                             numpy.logical_not(did_it_limit))
+                                          numpy.logical_not(did_it_limit))
             # Get back nodal values
             g.a = g.modal_to_nodal(a_modal)
-            
+
         return g.a
-            
+
     def riemann(self, al, ar):
         """
         Riemann problem for advection -- this is simply upwinding,
@@ -300,7 +292,7 @@ class Simulation(object):
         # Use Riemann solver to get fluxes between elements
         boundary_f = self.riemann(*self.states())
         rhs = interior_f
-        rhs[ 0, 1:-1] += boundary_f[1:-1]
+        rhs[0, 1:-1] += boundary_f[1:-1]
         rhs[-1, 1:-1] -= boundary_f[2:]
 
         # Multiply by mass matrix (inverse).
@@ -347,7 +339,7 @@ class Simulation(object):
         """ evolve the linear advection equation using scipy """
         self.t = 0.0
         g = self.grid
-        
+
         def rk_substep_scipy(t, y):
             local_a = numpy.reshape(y, g.a.shape)
             # Periodic BCs
@@ -363,15 +355,15 @@ class Simulation(object):
             # element, etc.
             for i in range(g.ilo, g.ihi+2):
                 al[i] = local_a[-1, i-1]
-                ar[i] = local_a[ 0, i  ]
+                ar[i] = local_a[0, i]
             boundary_f = self.riemann(al, ar)
             rhs = interior_f
-            rhs[ 0, 1:-1] += boundary_f[1:-1]
+            rhs[0, 1:-1] += boundary_f[1:-1]
             rhs[-1, 1:-1] -= boundary_f[2:]
-    
+
             # Multiply by mass matrix (inverse).
             rhs_i = 2 / g.dx * g.M_inv @ rhs
-            
+
             return numpy.ravel(rhs_i, order='C')
 
         tmax = num_periods*self.period()
@@ -383,10 +375,9 @@ class Simulation(object):
         while r.successful() and r.t < tmax:
             dt = min(dt, tmax - r.t)
             r.integrate(r.t+dt)
-            g.a[:, :] = numpy.reshape(r.y, g.a.shape)
-            self.limit()
-            r.y = numpy.ravel(g.a)
-    
+        g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+        self.limit()
+
 
 if __name__ == "__main__":
 
@@ -422,10 +413,10 @@ if __name__ == "__main__":
         axes[i].set_ylabel(r"$a$")
     fig.tight_layout()
     lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#    fig.savefig('dg_limiter.pdf', 
+#    fig.savefig('dg_limiter.pdf',
 #                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
-    
+
     # -------------------------------------------------------------------------
     # Show the "grid" using a sine wave
 
@@ -436,8 +427,8 @@ if __name__ == "__main__":
 
     u = 1.0
 
-    colors="kbr"
-    symbols="sox"
+    colors = "kbr"
+    symbols = "sox"
     for m in range(1, 4):
         g = Grid1d(nx, ng, xmin=xmin, xmax=xmax, m=m)
         s = Simulation(g, u, C=0.5/(2*m+1))
@@ -456,8 +447,7 @@ if __name__ == "__main__":
     pyplot.legend()
     pyplot.show()
 
-
-    # Note that the highest m (4) doesn't converge at the expected rate - 
+    # Note that the highest m (4) doesn't converge at the expected rate -
     # probably limited by the time integrator.
     colors = "brckgy"
     symbols = "xo^<sd"
@@ -476,13 +466,12 @@ if __name__ == "__main__":
             errs[i, j] = s.grid.norm(s.grid.a - a_init)
         axes[0].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}')
         if m < 4:
-            axes[0].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
-                        f'{colors[i]}--')
+            axes[0].plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
+                         f'{colors[i]}--')
     axes[0].set_xlabel(r'$N$')
     axes[0].set_ylabel(r'$\|$Error$\|_2$')
     axes[0].set_title('RK4')
-    
-    
+
     # To check that it's a limitation of the time integrator, we can use
     # the scipy DOPRK8 integrator
     colors = "brckgy"
@@ -503,11 +492,11 @@ if __name__ == "__main__":
         axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
                        label=fr'$m={{{m}}}$')
         if m < 5:
-            axes[1].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+            axes[1].plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            axes[1].plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
+            axes[1].plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
     axes[1].set_xlabel(r'$N$')
@@ -515,12 +504,10 @@ if __name__ == "__main__":
     axes[1].set_title('DOPRK8')
     fig.tight_layout()
     lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    fig.savefig('dg_convergence_sine.pdf', 
+    fig.savefig('dg_convergence_sine.pdf',
                 bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
-    
-    
-    
+
     # Check convergence with the limiter on
     colors = "brckgy"
     symbols = "xo^<sd"
@@ -539,11 +526,11 @@ if __name__ == "__main__":
         axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
                        label=fr'$m={{{m}}}$')
         if m < 5:
-            axes[1].plot(nxs, errs[i,-2]*(nxs[-2]/nxs)**(m+1),
+            axes[1].plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            axes[1].plot(nxs[:-1], errs[i,-2]*(nxs[-2]/nxs[:-1])**(m+1),
+            axes[1].plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
     axes[1].set_xlabel(r'$N$')
@@ -551,7 +538,6 @@ if __name__ == "__main__":
     axes[1].set_title('DOPRK8')
     fig.tight_layout()
     lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#    fig.savefig('dg_convergence_sine_limiter.pdf', 
+#    fig.savefig('dg_convergence_sine_limiter.pdf',
 #                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
-    
