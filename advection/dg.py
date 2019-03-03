@@ -459,7 +459,7 @@ if __name__ == "__main__":
     # probably limited by the time integrator.
     colors = "brckgy"
     symbols = "xo^<sd"
-    fig, axes = pyplot.subplots(1, 2)
+    fig, axes = pyplot.subplots(1, 3)
     ms = numpy.array(range(1, 5))
     nxs = 2**numpy.array(range(3, 9))
     errs = numpy.zeros((len(ms), len(nxs)))
@@ -478,7 +478,7 @@ if __name__ == "__main__":
                          f'{colors[i]}--')
     axes[0].set_xlabel(r'$N$')
     axes[0].set_ylabel(r'$\|$Error$\|_2$')
-    axes[0].set_title('RK4')
+    axes[0].set_title('RK3')
 
     # To check that it's a limitation of the time integrator, we can use
     # the scipy DOPRK8 integrator
@@ -486,7 +486,7 @@ if __name__ == "__main__":
     symbols = "xo^<sd"
     ms = numpy.array(range(1, 6))
     nxs = 2**numpy.array(range(3, 9))
-    errs = numpy.zeros((len(ms), len(nxs)))
+    errs_dg = numpy.zeros((len(ms), len(nxs)))
     for i, m in enumerate(ms):
         for j, nx in enumerate(nxs):
             print(f"DOPRK8, m={m}, nx={nx}")
@@ -496,33 +496,23 @@ if __name__ == "__main__":
 #            s.init_cond("gaussian")
             a_init = g.a.copy()
             s.evolve_scipy(num_periods=1)
-            errs[i, j] = s.grid.norm(s.grid.a - a_init)
-        axes[1].loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
+            errs_dg[i, j] = s.grid.norm(s.grid.a - a_init)
+        axes[1].loglog(nxs, errs_dg[i, :], f'{colors[i]}{symbols[i]}',
                        label=fr'$m={{{m}}}$')
         if m < 5:
-            axes[1].plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
+            axes[1].plot(nxs, errs_dg[i, -2]*(nxs[-2]/nxs)**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            axes[1].plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
+            axes[1].plot(nxs[:-1], errs_dg[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
                          f'{colors[i]}--',
                          label=fr'$\propto (\Delta x)^{{{m+1}}}$')
     axes[1].set_xlabel(r'$N$')
     axes[1].set_ylabel(r'$\|$Error$\|_2$')
     axes[1].set_title('DOPRK8')
-    fig.tight_layout()
-    lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    fig.savefig('dg_convergence_sine.pdf',
-                bbox_extra_artists=(lgd,), bbox_inches='tight')
-    pyplot.show()
 
     # Check convergence with the limiter on
-    colors = "brckgy"
-    symbols = "xo^<sd"
-    fig, ax = pyplot.subplots(1, 1)
-    ms = numpy.array(range(1, 6))
-    nxs = 2**numpy.array(range(3, 9))
-    errs = numpy.zeros((len(ms), len(nxs)))
+    errs_lim = numpy.zeros((len(ms), len(nxs)))
     for i, m in enumerate(ms):
         for j, nx in enumerate(nxs):
             print(f"DOPRK8, m={m}, nx={nx}")
@@ -531,22 +521,22 @@ if __name__ == "__main__":
             s.init_cond("sine")
             a_init = g.a.copy()
             s.evolve_scipy(num_periods=1)
-            errs[i, j] = s.grid.norm(s.grid.a - a_init)
-        ax.loglog(nxs, errs[i, :], f'{colors[i]}{symbols[i]}',
-                  label=fr'$m={{{m}}}$')
+            errs_lim[i, j] = s.grid.norm(s.grid.a - a_init)
+        axes[2].loglog(nxs, errs_lim[i, :], f'{colors[i]}{symbols[i]}',
+                       label=fr'$m={{{m}}}$')
         if m < 5:
-            ax.plot(nxs, errs[i, -2]*(nxs[-2]/nxs)**(m+1),
-                    f'{colors[i]}--',
-                    label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+            axes[2].plot(nxs, errs_lim[i, -2]*(nxs[-2]/nxs)**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
         else:
-            ax.plot(nxs[:-1], errs[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
-                    f'{colors[i]}--',
-                    label=fr'$\propto (\Delta x)^{{{m+1}}}$')
-    ax.set_xlabel(r'$N$')
-    ax.set_ylabel(r'$\|$Error$\|_2$')
-    ax.set_title('DOPRK8, Moment limiter')
+            axes[2].plot(nxs[:-1], errs_lim[i, -2]*(nxs[-2]/nxs[:-1])**(m+1),
+                         f'{colors[i]}--',
+                         label=fr'$\propto (\Delta x)^{{{m+1}}}$')
+    axes[2].set_xlabel(r'$N$')
+    axes[2].set_ylabel(r'$\|$Error$\|_2$')
+    axes[2].set_title('DOPRK8, Moment limiter')
     fig.tight_layout()
-    lgd = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#    fig.savefig('dg_convergence_sine_limiter.pdf',
-#                bbox_extra_artists=(lgd,), bbox_inches='tight')
+    lgd = axes[2].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    fig.savefig('dg_convergence_sine.pdf',
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
