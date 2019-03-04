@@ -421,8 +421,8 @@ if __name__ == "__main__":
         axes[i].set_ylabel(r"$a$")
     fig.tight_layout()
     lgd = axes[1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#    fig.savefig('dg_limiter.pdf',
-#                bbox_extra_artists=(lgd,), bbox_inches='tight')
+    fig.savefig('dg_limiter.pdf',
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
     pyplot.show()
 
     # -------------------------------------------------------------------------
@@ -453,6 +453,7 @@ if __name__ == "__main__":
     pyplot.xlabel(r'$x$')
     pyplot.ylabel(r'$a$')
     pyplot.legend()
+    fig.savefig("dg_grid.pdf")
     pyplot.show()
 
     # Note that the highest m (4) doesn't converge at the expected rate -
