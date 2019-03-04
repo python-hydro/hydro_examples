@@ -435,7 +435,6 @@ if __name__ == "__main__":
 
     u = 1.0
 
-    pyplot.clf()
     colors = "kbr"
     symbols = "sox"
     for m in range(1, 4):
@@ -454,7 +453,7 @@ if __name__ == "__main__":
     pyplot.xlabel(r'$x$')
     pyplot.ylabel(r'$a$')
     pyplot.legend()
-    fig.savefig("dg_grid.pdf")
+    pyplot.savefig("dg_grid.pdf")
     pyplot.show()
 
     # Note that the highest m (4) doesn't converge at the expected rate -
