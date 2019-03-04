@@ -435,6 +435,7 @@ if __name__ == "__main__":
 
     u = 1.0
 
+    pyplot.clf()
     colors = "kbr"
     symbols = "sox"
     for m in range(1, 4):
