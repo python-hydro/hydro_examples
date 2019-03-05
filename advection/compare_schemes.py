@@ -98,7 +98,7 @@ colors = "brk"
 fig, ax = pyplot.subplots(1, 1)
 for i_o, order in enumerate(weno_orders):
     ax.loglog(weno_times[i_o, :], weno_errs[i_o, :], f'{colors[i_o]}o-',
-              label=f'WENO, order={order}')
+              label=f'WENO, r={order}')
 colors = "gyc"
 for i_m, m in enumerate(dg_ms):
     ax.loglog(dg_nolimit_times[i_m, :], dg_nolimit_errs[i_m, :], 
