@@ -61,7 +61,7 @@ def errs_dg(m=3, nx=8, limiter=None):
     s = dg.Simulation(g, 1, C=0.5/(2*m+1), limiter=limiter)
     s.init_cond("sine")
     a_init = g.a.copy()
-    s.evolve_scipy_jit()
+    s.evolve_scipy()
     return g.norm(g.a - a_init)
 
 
@@ -72,7 +72,6 @@ weno_N = [12, 16, 24, 32, 54, 64, 96, 128]
 weno_times = numpy.zeros((len(weno_orders), len(weno_N)))
 weno_errs = numpy.zeros_like(weno_times)
 # weno_memory = numpy.zeros_like(weno_times)
-# weno_opt_memory = numpy.zeros_like(weno_opt_times)
 
 # Do one evolution to kick-start numba
 run_weno(3, 8)
@@ -114,6 +113,21 @@ for i_m, m in enumerate(dg_ms):
 ax.set_xlabel("Runtime [s]")
 ax.set_ylabel(r"$\|$Error$\|_2$")
 ax.set_title("Efficiency of WENO vs DG")
+
+i_o = 0
+i_n = 4
+con_style = "arc,angleA=180,armA=50,rad=10"
+ax.annotate(fr'WENO, $N={weno_N[i_n]}$', textcoords='data',
+            xy=(weno_times[i_o, i_n], 1.5*weno_errs[i_o, i_n]),
+            xytext=(5e-1, 1e-2),
+            arrowprops=dict(arrowstyle='->', connectionstyle=con_style))
+i_m = 1
+i_n = 0
+ax.annotate(fr'DG, $N={dg_N[i_n]}$', textcoords='data',
+            xy=(dg_moment_times[i_m, i_n], 0.5*dg_moment_errs[i_m, i_n]),
+            xytext=(3e-1, 1e-8),
+            arrowprops=dict(arrowstyle='->', connectionstyle=con_style))
+
 fig.tight_layout()
 lgd = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 fig.savefig('dg_weno_efficiency.pdf',
