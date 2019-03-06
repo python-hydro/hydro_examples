@@ -8,7 +8,7 @@ from matplotlib import pyplot
 import matplotlib as mpl
 import quadpy
 from numba import jit
-import tqdm
+# import tqdm
 
 mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['mathtext.rm'] = 'serif'
@@ -134,6 +134,11 @@ class Grid1d(object):
 
 
 @jit
+def burgers_flux(u):
+    return u**2/2
+
+
+@jit
 def minmod3(a1, a2, a3):
     """
     Utility function that does minmod on three inputs
@@ -231,10 +236,10 @@ class Simulation(object):
             def init_u(x):
                 return numpy.where(numpy.logical_and(x >= 0.333,
                                                      x <= 0.666),
-                                   numpy.ones_like(x) + 
+                                   numpy.ones_like(x) +
                                    0.5 * numpy.sin(
-                                           2.0*numpy.pi*
-                                           (x-0.333)/0.333),
+                                           2.0 * numpy.pi *
+                                           (x - 0.333) / 0.333),
                                    numpy.ones_like(x))
         elif type == "smooth_sine":
             def init_u(x):
@@ -256,7 +261,6 @@ class Simulation(object):
         """ return the advective timestep """
         return self.C*self.grid.dx/numpy.max(numpy.abs(
                 self.grid.u[:, self.grid.ilo:self.grid.ihi+1]))
-
 
     def states(self):
         """ compute the left and right interface states """
@@ -341,7 +345,7 @@ class Simulation(object):
         Riemann problem for Burgers using Lax-Friedrichs
         """
 
-        return ((ul**2 + ur**2)/2 - (ur - ul)*alpha)/2
+        return ((burgers_flux(ul) + burgers_flux(ur)) - (ur - ul)*alpha)/2
 
     def rk_substep(self, dt):
         """
@@ -352,10 +356,10 @@ class Simulation(object):
         rhs = g.scratch_array()
 
         # Integrate flux over element
-        f = 0.5 * g.u**2
+        f = burgers_flux(g.u)
         interior_f = g.S.T @ f
         # Use Riemann solver to get fluxes between elements
-        boundary_f = self.riemann(*self.states(), 2*numpy.max(numpy.abs(g.u)))
+        boundary_f = self.riemann(*self.states(), numpy.max(numpy.abs(g.u)))
         rhs = interior_f
         rhs[0, 1:-1] += boundary_f[1:-1]
         rhs[-1, 1:-1] -= boundary_f[2:]
@@ -373,7 +377,7 @@ class Simulation(object):
         # main evolution loop
 #        pbar = tqdm.tqdm(total=100)
         while self.t < tmax:
-#            pbar.update(100*self.t/tmax)
+            # pbar.update(100*self.t/tmax)
             # fill the boundary conditions
             g.fill_BCs()
 
@@ -404,6 +408,7 @@ class Simulation(object):
             self.t += dt
 #        pbar.close()
 
+
 if __name__ == "__main__":
 
     # Runs with limiter
@@ -412,7 +417,7 @@ if __name__ == "__main__":
     xmin = 0
     xmax = 1
     ms = [1, 3, 5]
-    colors='brcy'
+    colors = 'brcy'
     for i_m, m in enumerate(ms):
         g = Grid1d(nx, ng, xmin, xmax, m)
         s = Simulation(g, C=0.5/(2*m+1), limiter="moment")
