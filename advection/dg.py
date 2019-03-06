@@ -8,6 +8,7 @@ from matplotlib import pyplot
 import matplotlib as mpl
 import quadpy
 from scipy.integrate import ode
+from numba import jit
 
 mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['mathtext.rm'] = 'serif'
@@ -146,6 +147,141 @@ def minmod3(a1, a2, a3):
                        axis=0) * numpy.sign(a1)
 
     return numpy.where(same_sign, minmod, numpy.zeros_like(a1))
+
+
+@jit
+def minmod3_jit(a1, a2, a3):
+    """
+    Utility function that does minmod on three inputs
+    """
+    signs1 = a1 * a2
+    signs2 = a1 * a3
+    signs3 = a2 * a3
+    same_sign = numpy.logical_and(numpy.logical_and(signs1 > 0,
+                                                    signs2 > 0),
+                                  signs3 > 0)
+    minmod = numpy.min(numpy.abs(numpy.vstack((a1, a2, a3))),
+                       axis=0) * numpy.sign(a1)
+
+    return numpy.where(same_sign, minmod, numpy.zeros_like(a1))
+
+
+def limit(g, limiter):
+    """
+    After evolution, limit the slopes.
+    """
+
+    # Limiting!
+
+    if limiter == "moment":
+
+        # Limiting, using moment limiting (Hesthaven p 445-7)
+        theta = 2
+        a_modal = g.nodal_to_modal()
+        # First, work out where limiting is needed
+        limiting_todo = numpy.ones(g.nx+2*g.ng, dtype=bool)
+        limiting_todo[:g.ng] = False
+        limiting_todo[-g.ng:] = False
+        # Get the cell average and the nodal values at the boundaries
+        a_zeromode = a_modal.copy()
+        a_zeromode[1:, :] = 0
+        a_cell = (g.V @ a_zeromode)[0, :]
+        a_minus = g.a[0, :]
+        a_plus = g.a[-1, :]
+        # From the cell averages and boundary values we can construct
+        # alternate values at the boundaries
+        a_left = numpy.zeros(g.nx+2*g.ng)
+        a_right = numpy.zeros(g.nx+2*g.ng)
+        a_left[1:-1] = a_cell[1:-1] - minmod3(a_cell[1:-1] - a_minus[1:-1],
+                                              a_cell[1:-1] - a_cell[:-2],
+                                              a_cell[2:] - a_cell[1:-1])
+        a_right[1:-1] = a_cell[1:-1] + minmod3(a_plus[1:-1] - a_cell[1:-1],
+                                               a_cell[1:-1] - a_cell[:-2],
+                                               a_cell[2:] - a_cell[1:-1])
+        limiting_todo[1:-1] = numpy.logical_not(
+                numpy.logical_and(numpy.isclose(a_left[1:-1],
+                                                a_minus[1:-1]),
+                                  numpy.isclose(a_right[1:-1],
+                                                a_plus[1:-1])))
+        # Now, do the limiting. Modify moments where needed, and as soon as
+        # limiting isn't needed, stop
+        updated_mode = numpy.zeros(g.nx+2*g.ng)
+        for i in range(g.m-1, -1, -1):
+            factor = numpy.sqrt((2*i+3)*(2*i+5))
+            a1 = factor * a_modal[i+1, 1:-1]
+            a2 = theta * (a_modal[i, 2:] - a_modal[i, 1:-1])
+            a3 = theta * (a_modal[i, 1:-1] - a_modal[i, :-2])
+            updated_mode[1:-1] = minmod3(a1, a2, a3) / factor
+            did_it_limit = numpy.isclose(a_modal[i+1, 1:-1],
+                                         updated_mode[1:-1])
+            a_modal[i+1, limiting_todo] = updated_mode[limiting_todo]
+            limiting_todo[1:-1] = numpy.logical_and(limiting_todo[1:-1],
+                                      numpy.logical_not(did_it_limit))
+        # Get back nodal values
+        limited_a = g.modal_to_nodal(a_modal)
+
+    else:
+        limited_a = g.a
+
+    return limited_a
+
+
+@jit
+def limit_jit(g, limiter):
+    """
+    After evolution, limit the slopes.
+    """
+
+    # Limiting!
+
+    if limiter == "moment":
+
+        # Limiting, using moment limiting (Hesthaven p 445-7)
+        theta = 2
+        a_modal = g.nodal_to_modal()
+        # First, work out where limiting is needed
+        limiting_todo = numpy.ones(g.nx+2*g.ng, dtype=bool)
+        limiting_todo[:g.ng] = False
+        limiting_todo[-g.ng:] = False
+        # Get the cell average and the nodal values at the boundaries
+        a_zeromode = a_modal.copy()
+        a_zeromode[1:, :] = 0
+        a_cell = (g.V @ a_zeromode)[0, :]
+        a_minus = g.a[0, :]
+        a_plus = g.a[-1, :]
+        # From the cell averages and boundary values we can construct
+        # alternate values at the boundaries
+        a_left = numpy.zeros(g.nx+2*g.ng)
+        a_right = numpy.zeros(g.nx+2*g.ng)
+        a_left[1:-1] = a_cell[1:-1] - minmod3(a_cell[1:-1] - a_minus[1:-1],
+                                              a_cell[1:-1] - a_cell[:-2],
+                                              a_cell[2:] - a_cell[1:-1])
+        a_right[1:-1] = a_cell[1:-1] + minmod3(a_plus[1:-1] - a_cell[1:-1],
+                                               a_cell[1:-1] - a_cell[:-2],
+                                               a_cell[2:] - a_cell[1:-1])
+        limiting_todo[1:-1] = numpy.logical_not(
+                numpy.logical_and(numpy.isclose(a_left[1:-1],
+                                                a_minus[1:-1]),
+                                  numpy.isclose(a_right[1:-1],
+                                                a_plus[1:-1])))
+        # Now, do the limiting. Modify moments where needed, and as soon as
+        # limiting isn't needed, stop
+        updated_mode = numpy.zeros(g.nx+2*g.ng)
+        for i in range(g.m-1, -1, -1):
+            factor = numpy.sqrt((2*i+3)*(2*i+5))
+            a1 = factor * a_modal[i+1, 1:-1]
+            a2 = theta * (a_modal[i, 2:] - a_modal[i, 1:-1])
+            a3 = theta * (a_modal[i, 1:-1] - a_modal[i, :-2])
+            updated_mode[1:-1] = minmod3(a1, a2, a3) / factor
+            did_it_limit = numpy.isclose(a_modal[i+1, 1:-1],
+                                         updated_mode[1:-1])
+            a_modal[i+1, limiting_todo] = updated_mode[limiting_todo]
+            limiting_todo[1:-1] = numpy.logical_and(limiting_todo[1:-1],
+                                      numpy.logical_not(did_it_limit))
+        # Get back nodal values
+        limited_a = g.modal_to_nodal(a_modal)
+
+    return limited_a
 
 
 class Simulation(object):
@@ -384,6 +520,57 @@ class Simulation(object):
             r.integrate(r.t+dt)
             g.a[:, :] = numpy.reshape(r.y, g.a.shape)
             g.a = self.limit()
+            self.t += dt
+
+    def evolve_scipy_jit(self, num_periods=1):
+        """ evolve the linear advection equation using scipy """
+        self.t = 0.0
+        g = self.grid
+
+        def rk_substep_scipy_jit(t, y):
+            local_a = numpy.reshape(y, g.a.shape)
+            # Periodic BCs
+            local_a[:, :g.ng] = local_a[:, -2*g.ng:-g.ng]
+            local_a[:, -g.ng:] = local_a[:, g.ng:2*g.ng]
+            # Integrate flux over element
+            f = self.u * local_a
+            interior_f = g.S.T @ f
+            # Use Riemann solver to get fluxes between elements
+            al = numpy.zeros(g.nx+2*g.ng)
+            ar = numpy.zeros(g.nx+2*g.ng)
+            # i is looping over interfaces, so al is the right edge of the left
+            # element, etc.
+            for i in range(g.ilo, g.ihi+2):
+                al[i] = local_a[-1, i-1]
+                ar[i] = local_a[0, i]
+            boundary_f = self.riemann(al, ar)
+            rhs = interior_f
+            rhs[0, 1:-1] += boundary_f[1:-1]
+            rhs[-1, 1:-1] -= boundary_f[2:]
+
+            # Multiply by mass matrix (inverse).
+            rhs_i = 2 / g.dx * g.M_inv @ rhs
+
+            return numpy.ravel(rhs_i, order='C')
+
+        tmax = num_periods*self.period()
+
+        # main evolution loop
+        while self.t < tmax:
+            # fill the boundary conditions
+            g.fill_BCs()
+
+            # get the timestep
+            dt = self.timestep()
+
+            if self.t + dt > tmax:
+                dt = tmax - self.t
+
+            r = ode(rk_substep_scipy_jit).set_integrator('dop853')
+            r.set_initial_value(numpy.ravel(g.a), self.t)
+            r.integrate(r.t+dt)
+            g.a[:, :] = numpy.reshape(r.y, g.a.shape)
+            g.a = limit(g, self.limiter)
             self.t += dt
 
 
