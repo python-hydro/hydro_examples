@@ -441,8 +441,7 @@ class Simulation(object):
 #        pbar.close()
 
 
-if __name__ == "__main__":
-
+def plot_sod(nx, filename=None):
     # setup the problem -- Sod
     left = riemann.State(p=1.0, u=0.0, rho=1.0)
     right = riemann.State(p=0.1, u=0.0, rho=0.125)
@@ -455,15 +454,19 @@ if __name__ == "__main__":
     x_e -= 0.5
 
     # Runs with limiter
-    nx = 32
     ng = 1
     xmin = -0.5
     xmax = 0.5
     ms = [1, 3, 5]
-    colors = 'brcy'
+    colors = 'bry'
+    fig, axes = pyplot.subplots(2, 2)
+    axes[0, 0].plot(x_e, rho_e, 'k-', linewidth=2)
+    axes[0, 1].plot(x_e, v_e, 'k-', linewidth=2, label="Exact")
+    axes[1, 0].plot(x_e, p_e, 'k-', linewidth=2)
+    axes[1, 1].plot(x_e, e_e, 'k-', linewidth=2)
     for i_m, m in enumerate(ms):
         g = Grid1d(nx, ng, xmin, xmax, m)
-        s = Simulation(g, C=0.5/(2*m+1), limiter="moment")
+        s = Simulation(g, C=0.1/(2*m+1), limiter="moment")
         s.init_cond("sod")
         s.evolve(0.2)
         x, u = g.plotting_data()
@@ -471,23 +474,30 @@ if __name__ == "__main__":
         v = u[1, :] / u[0, :]
         e = (u[2, :] - rho * v**2 / 2) / rho
         p = (s.eos_gamma - 1) * (u[2, :] - rho * v**2 / 2)
-        fig, axes = pyplot.subplots(2, 2)
-        axes[0, 0].plot(x[g.ilo:g.ihi+1], rho[g.ilo:g.ihi+1], 'bo')
-        axes[0, 0].plot(x_e, rho_e, 'k--')
-        axes[0, 1].plot(x[g.ilo:g.ihi+1], v[g.ilo:g.ihi+1], 'bo')
-        axes[0, 1].plot(x_e, v_e, 'k--')
-        axes[1, 0].plot(x[g.ilo:g.ihi+1], p[g.ilo:g.ihi+1], 'bo')
-        axes[1, 0].plot(x_e, p_e, 'k--')
-        axes[1, 1].plot(x[g.ilo:g.ihi+1], e[g.ilo:g.ihi+1], 'bo')
-        axes[1, 1].plot(x_e, e_e, 'k--')
-        axes[1, 0].set_xlabel(r"$x$")
-        axes[1, 1].set_xlabel(r"$x$")
-        axes[0, 0].set_ylabel(r"$\rho$")
-        axes[0, 1].set_ylabel(r"$v$")
-        axes[1, 0].set_ylabel(r"$p$")
-        axes[1, 1].set_ylabel(r"$e$")
-        for ax in axes.flatten():
-            ax.set_xlim(-0.5, 0.5)
-        fig.tight_layout()
-        pyplot.show()
+        axes[0, 0].plot(x, rho, f'{colors[i_m]}--')
+        axes[0, 1].plot(x, v, f'{colors[i_m]}--', label=fr"$m={m}$")
+        axes[1, 0].plot(x, p, f'{colors[i_m]}--')
+        axes[1, 1].plot(x, e, f'{colors[i_m]}--')
+    axes[1, 0].set_xlabel(r"$x$")
+    axes[1, 1].set_xlabel(r"$x$")
+    axes[0, 0].set_ylabel(r"$\rho$")
+    axes[0, 1].set_ylabel(r"$v$")
+    axes[1, 0].set_ylabel(r"$p$")
+    axes[1, 1].set_ylabel(r"$e$")
+    axes[0, 0].set_title("Discontinuous Galerkin")
+    axes[0, 1].set_title(rf"$N={nx}$, Sod problem")
+    for ax in axes.flatten():
+        ax.set_xlim(-0.5, 0.5)
+    fig.tight_layout()
+    lgd = axes[0, 1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    if filename:
+        fig.savefig(filename,
+                    bbox_extra_artists=(lgd,), bbox_inches='tight')
+    pyplot.show()
 
+
+if __name__ == "__main__":
+
+    # Runs with limiter
+    for nx in [32, 128]:
+        plot_sod(nx, f'dg_sod_{nx}.pdf')
