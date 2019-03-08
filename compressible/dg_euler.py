@@ -12,6 +12,7 @@ import quadpy
 from numba import jit
 import tqdm
 import riemann
+import weno_euler
 
 mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['mathtext.rm'] = 'serif'
@@ -278,7 +279,6 @@ class Simulation(object):
             self.grid.u[2] = numpy.where(x < 0,
                                          E_l * numpy.ones_like(x),
                                          E_r * numpy.ones_like(x))
-
         elif type == "shock-entropy":
             x = self.grid.all_nodes_per_node
             rho_l = 3.857143 * numpy.ones_like(x)
@@ -526,29 +526,52 @@ def plot_sod(nx, filename=None):
     pyplot.show()
 
 
-def plot_shock_entropy(nx, filename=None):
+def weno_reference_shock_entropy(nx=512):
+    """
+    A reference solution for the shock-entropy problem.
+    
+    Note that this is slow: 20 minutes or so using the standard parameters,
+    and obviously more resolution would be better.
+    """
+    order = 4
+    ng = order+2
+    C = 0.5
+    xmin = -5
+    xmax = 5
+    g = weno_euler.Grid1d(nx, ng, xmin, xmax, bc="outflow")
+    s = weno_euler.WENOSimulation(g, C, order)
+    s.init_cond("shock-entropy")
+    s.evolve(1.8, reconstruction='characteristic')
+    return g.x, g.q
+
+def plot_shock_entropy(nx, m, x_ref, u_ref, filename=None):
     # Runs with limiter
     ng = 1
     xmin = -5
     xmax = 5
-    ms = [1, 3, 5]
-    colors = 'bry'
     fig, axes = pyplot.subplots(2, 2)
-    for i_m, m in enumerate(ms):
-        g = Grid1d(nx, ng, xmin, xmax, m)
-        s = Simulation(g, C=0.1/(2*m+1), limiter="moment")
-        s.init_cond("shock-entropy")
-        print(f"Evolving m={m}")
-        s.evolve(1.8)
-        x, u = g.plotting_data()
-        rho = u[0, :]
-        v = u[1, :] / u[0, :]
-        e = (u[2, :] - rho * v**2 / 2) / rho
-        p = (s.eos_gamma - 1) * (u[2, :] - rho * v**2 / 2)
-        axes[0, 0].plot(x, rho, f'{colors[i_m]}--')
-        axes[0, 1].plot(x, v, f'{colors[i_m]}--', label=fr"$m={m}$")
-        axes[1, 0].plot(x, p, f'{colors[i_m]}--')
-        axes[1, 1].plot(x, e, f'{colors[i_m]}--')
+    rho_ref = u_ref[0, :]
+    v_ref = u_ref[1, :] / u_ref[0, :]
+    e_ref = (u_ref[2, :] - rho_ref * v_ref**2 / 2) / rho_ref
+    p_ref = 0.4 * (u_ref[2, :] - rho_ref * v_ref**2 / 2)
+    axes[0, 0].plot(x_ref, rho_ref, 'k--')
+    axes[0, 1].plot(x_ref, v_ref, 'k--', label="Reference")
+    axes[1, 0].plot(x_ref, p_ref, 'k--')
+    axes[1, 1].plot(x_ref, e_ref, 'k--')
+    # Evolve DG
+    g = Grid1d(nx, ng, xmin, xmax, m)
+    s = Simulation(g, C=0.1/(2*m+1), limiter="moment")
+    s.init_cond("shock-entropy")
+    s.evolve(1.8)
+    x, u = g.plotting_data()
+    rho = u[0, :]
+    v = u[1, :] / u[0, :]
+    e = (u[2, :] - rho * v**2 / 2) / rho
+    p = (s.eos_gamma - 1) * (u[2, :] - rho * v**2 / 2)
+    axes[0, 0].plot(x, rho, 'b-')
+    axes[0, 1].plot(x, v, 'b-', label=fr"$m={m}$")
+    axes[1, 0].plot(x, p, 'b-')
+    axes[1, 1].plot(x, e, 'b-')
     axes[1, 0].set_xlabel(r"$x$")
     axes[1, 1].set_xlabel(r"$x$")
     axes[0, 0].set_ylabel(r"$\rho$")
@@ -556,7 +579,7 @@ def plot_shock_entropy(nx, filename=None):
     axes[1, 0].set_ylabel(r"$p$")
     axes[1, 1].set_ylabel(r"$e$")
     axes[0, 0].set_title("Discontinuous Galerkin")
-    axes[0, 1].set_title(rf"$N={nx}$, Sod problem")
+    axes[0, 1].set_title(rf"$N={nx}$, shock-entropy problem")
     for ax in axes.flatten():
         ax.set_xlim(xmin, xmax)
     fig.tight_layout()
@@ -573,6 +596,11 @@ if __name__ == "__main__":
 #    for nx in [32, 128]:
 #        plot_sod(nx, f'dg_sod_{nx}.pdf')
 
-    for nx in [128, 256]:
-        plot_shock_entropy(nx)
+    # Reference solution for shock-entropy using WENO
+    x_ref, u_ref = weno_reference_shock_entropy()    
+    
+    for m in [1, 3, 5]:
+        for nx in [128, 256]:
+            plot_shock_entropy(nx, m, x_ref, u_ref,
+                               f'dg_shock_entropy_m{m}_N{nx}.pdf')
 
