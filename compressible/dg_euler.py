@@ -10,7 +10,7 @@ from matplotlib import pyplot
 import matplotlib as mpl
 import quadpy
 from numba import jit
-# import tqdm
+import tqdm
 import riemann
 
 mpl.rcParams['mathtext.fontset'] = 'cm'
@@ -279,6 +279,30 @@ class Simulation(object):
                                          E_l * numpy.ones_like(x),
                                          E_r * numpy.ones_like(x))
 
+        elif type == "shock-entropy":
+            x = self.grid.all_nodes_per_node
+            rho_l = 3.857143 * numpy.ones_like(x)
+            rho_r = 0.2 * numpy.sin(numpy.pi*x) + 1
+            v_l = 2.629369 * numpy.ones_like(x)
+            v_r = 0 * numpy.ones_like(x)
+            p_l = 10.33333 * numpy.ones_like(x)
+            p_r = 1 * numpy.ones_like(x)
+            S_l = rho_l * v_l
+            S_r = rho_r * v_r
+            e_l = p_l / rho_l / (self.eos_gamma - 1)
+            e_r = p_r / rho_r / (self.eos_gamma - 1)
+            E_l = rho_l * (e_l + v_l**2 / 2)
+            E_r = rho_r * (e_r + v_r**2 / 2)
+            self.grid.u[0] = numpy.where(x < -4,
+                                         rho_l,
+                                         rho_r)
+            self.grid.u[1] = numpy.where(x < -4,
+                                         S_l,
+                                         S_r)
+            self.grid.u[2] = numpy.where(x < -4,
+                                         E_l,
+                                         E_r)
+
     def max_lambda(self):
         rho = self.grid.u[0]
         v = self.grid.u[1] / rho
@@ -407,9 +431,15 @@ class Simulation(object):
         g = self.grid
 
         # main evolution loop
-#        pbar = tqdm.tqdm(total=100)
+        # Estimate number of timesteps
+        nt_estimate = int(tmax / self.timestep() * 10)
+        prev_it = 0
+        pbar = tqdm.tqdm(total=nt_estimate)
         while self.t < tmax:
-            # pbar.update(100*self.t/tmax)
+            curr_it = int(nt_estimate * self.t / tmax)
+            pbar.update(curr_it - prev_it)
+            prev_it = curr_it
+#            print(self.t)
             # fill the boundary conditions
             g.fill_BCs()
 
@@ -438,7 +468,7 @@ class Simulation(object):
             g.fill_BCs()
 
             self.t += dt
-#        pbar.close()
+        pbar.close()
 
 
 def plot_sod(nx, filename=None):
@@ -496,8 +526,53 @@ def plot_sod(nx, filename=None):
     pyplot.show()
 
 
+def plot_shock_entropy(nx, filename=None):
+    # Runs with limiter
+    ng = 1
+    xmin = -5
+    xmax = 5
+    ms = [1, 3, 5]
+    colors = 'bry'
+    fig, axes = pyplot.subplots(2, 2)
+    for i_m, m in enumerate(ms):
+        g = Grid1d(nx, ng, xmin, xmax, m)
+        s = Simulation(g, C=0.1/(2*m+1), limiter="moment")
+        s.init_cond("shock-entropy")
+        print(f"Evolving m={m}")
+        s.evolve(1.8)
+        x, u = g.plotting_data()
+        rho = u[0, :]
+        v = u[1, :] / u[0, :]
+        e = (u[2, :] - rho * v**2 / 2) / rho
+        p = (s.eos_gamma - 1) * (u[2, :] - rho * v**2 / 2)
+        axes[0, 0].plot(x, rho, f'{colors[i_m]}--')
+        axes[0, 1].plot(x, v, f'{colors[i_m]}--', label=fr"$m={m}$")
+        axes[1, 0].plot(x, p, f'{colors[i_m]}--')
+        axes[1, 1].plot(x, e, f'{colors[i_m]}--')
+    axes[1, 0].set_xlabel(r"$x$")
+    axes[1, 1].set_xlabel(r"$x$")
+    axes[0, 0].set_ylabel(r"$\rho$")
+    axes[0, 1].set_ylabel(r"$v$")
+    axes[1, 0].set_ylabel(r"$p$")
+    axes[1, 1].set_ylabel(r"$e$")
+    axes[0, 0].set_title("Discontinuous Galerkin")
+    axes[0, 1].set_title(rf"$N={nx}$, Sod problem")
+    for ax in axes.flatten():
+        ax.set_xlim(xmin, xmax)
+    fig.tight_layout()
+    lgd = axes[0, 1].legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    if filename:
+        fig.savefig(filename,
+                    bbox_extra_artists=(lgd,), bbox_inches='tight')
+    pyplot.show()
+
+
 if __name__ == "__main__":
 
     # Runs with limiter
-    for nx in [32, 128]:
-        plot_sod(nx, f'dg_sod_{nx}.pdf')
+#    for nx in [32, 128]:
+#        plot_sod(nx, f'dg_sod_{nx}.pdf')
+
+    for nx in [128, 256]:
+        plot_shock_entropy(nx)
+
