@@ -86,14 +86,17 @@ class Grid1d(object):
             # right boundary
             self.a[self.ihi+1+n] = self.a[self.ilo+n]
 
-    def norm(self, e):
+    def norm(self, e, norm="inf"):
         """ return the norm of quantity e which lives on the grid """
         if len(e) != 2*self.ng + self.nx:
             return None
 
-        #return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
-        return np.max(abs(e[self.ilo:self.ihi+1]))
-
+        if norm==2:
+            return np.sqrt(self.dx*np.sum(e[self.ilo:self.ihi+1]**2))
+        elif norm=="inf":
+            return np.max(abs(e[self.ilo:self.ihi+1]))
+        else:
+            raise NotImplementedError("Only norms implemented are '2' and 'inf'")
 
 class Simulation(object):
 
