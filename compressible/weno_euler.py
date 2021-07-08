@@ -3,6 +3,7 @@ import numpy
 from matplotlib import pyplot
 import weno_coefficients
 import riemann
+import tqdm
 
 class Grid1d(object):
 
@@ -172,6 +173,29 @@ class WENOSimulation(object):
             self.grid.q[2] = numpy.where(self.grid.x < 0,
                                          E_l * numpy.ones_like(self.grid.x),
                                          E_r * numpy.ones_like(self.grid.x))
+        elif type == "shock-entropy":
+            x = self.grid.x
+            rho_l = 3.857143 * numpy.ones_like(x)
+            rho_r = 0.2 * numpy.sin(numpy.pi*x) + 1
+            v_l = 2.629369 * numpy.ones_like(x)
+            v_r = 0 * numpy.ones_like(x)
+            p_l = 10.33333 * numpy.ones_like(x)
+            p_r = 1 * numpy.ones_like(x)
+            S_l = rho_l * v_l
+            S_r = rho_r * v_r
+            e_l = p_l / rho_l / (self.eos_gamma - 1)
+            e_r = p_r / rho_r / (self.eos_gamma - 1)
+            E_l = rho_l * (e_l + v_l**2 / 2)
+            E_r = rho_r * (e_r + v_r**2 / 2)
+            self.grid.q[0] = numpy.where(x < -4,
+                                         rho_l,
+                                         rho_r)
+            self.grid.q[1] = numpy.where(x < -4,
+                                         S_l,
+                                         S_r)
+            self.grid.q[2] = numpy.where(x < -4,
+                                         E_l,
+                                         E_r)
 
 
     def max_lambda(self):
@@ -297,7 +321,14 @@ class WENOSimulation(object):
             stepper = self.rk_substep_characteristic
 
         # main evolution loop
+        # Estimate number of timesteps
+        nt_estimate = int(tmax / self.timestep() * 10)
+        prev_it = 0
+        pbar = tqdm.tqdm(total=nt_estimate)
         while self.t < tmax:
+            curr_it = int(nt_estimate * self.t / tmax)
+            pbar.update(curr_it - prev_it)
+            prev_it = curr_it
 
             # fill the boundary conditions
             g.fill_BCs()
@@ -331,7 +362,7 @@ class WENOSimulation(object):
 
             self.t += dt
 #            print("t=", self.t)
-
+        pbar.close()
 
 
 if __name__ == "__main__":
