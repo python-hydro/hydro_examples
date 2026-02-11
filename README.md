@@ -7,7 +7,7 @@ All the codes are *standalone* -- there are no interdependencies.
 
 These codes go together with the lecture notes at:
 
-http://bender.astro.sunysb.edu/hydro_by_example/CompHydroTutorial.pdf
+https://open-astrophysics-bookshelf.github.io/numerical_exercises/
 
 and with the pyro2 code:
 
