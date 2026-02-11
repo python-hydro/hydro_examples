@@ -11,7 +11,7 @@ https://open-astrophysics-bookshelf.github.io/numerical_exercises/
 
 and with the pyro2 code:
 
-https://github.com/zingale/pyro2
+https://github.com/python-hydro/pyro2
 
 
 

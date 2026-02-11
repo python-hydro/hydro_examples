@@ -1,12 +1,24 @@
-# solve the Riemann problem for a gamma-law gas
+"""An exact Riemann solver for the Euler equations with a gamma-law
+gas.  The left and right states are stored as State objects.  We then
+create a RiemannProblem object with the left and right state:
 
-from __future__ import print_function
+> rp = RiemannProblem(left_state, right_state)
+
+Next we solve for the star state:
+
+> rp.find_star_state()
+
+Finally, we sample the solution to find the interface state, which
+is returned as a State object:
+
+> q_int = rp.sample_solution()
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as optimize
 
-class State(object):
+class State:
     """ a simple object to hold a primitive variable state """
 
     def __init__(self, p=1.0, u=0.0, rho=1.0):
@@ -15,9 +27,9 @@ class State(object):
         self.rho = rho
 
     def __str__(self):
-        return "rho: {}; u: {}; p: {}".format(self.rho, self.u, self.p)
+        return f"rho: {self.rho}; u: {self.u}; p: {self.p}"
 
-class RiemannProblem(object):
+class RiemannProblem:
     """ a class to define a Riemann problem.  It takes a left
         and right state.  Note: we assume a constant gamma """
 
@@ -28,6 +40,9 @@ class RiemannProblem(object):
 
         self.ustar = None
         self.pstar = None
+
+    def __str__(self):
+        return f"pstar = {self.pstar}, ustar = {self.ustar}"
 
     def u_hugoniot(self, p, side, shock=False):
         """define the Hugoniot curve, u(p).  If shock=True, we do a 2-shock
@@ -80,11 +95,67 @@ class RiemannProblem(object):
             p_min, p_max)
         self.ustar = self.u_hugoniot(self.pstar, "left", shock=True)
 
+    def shock_solution(self, sgn, xi, state):
+        """return the interface solution considering a shock"""
+
+        p_ratio = self.pstar/state.p
+        c = np.sqrt(self.gamma*state.p/state.rho)
+
+        # Toro, eq. 4.52 / 4.59
+        S = state.u + sgn*c*np.sqrt(0.5*(self.gamma + 1.0)/self.gamma*p_ratio +
+                                    0.5*(self.gamma - 1.0)/self.gamma)
+
+        # are we to the left or right of the shock?
+        if (sgn > 0 and xi > S) or (sgn < 0 and xi < S):
+            # R/L region
+            solution = state
+        else:
+            # * region -- get rhostar from Toro, eq. 4.50 / 4.57
+            gam_fac = (self.gamma - 1.0)/(self.gamma + 1.0)
+            rhostar = state.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
+            solution = State(rho=rhostar, u=self.ustar, p=self.pstar)
+
+        return solution
+
+    def rarefaction_solution(self, sgn, xi, state):
+        """return the interface solution considering a rarefaction wave"""
+
+        # find the speed of the head and tail of the rarefaction fan
+
+        # isentropic (Toro eq. 4.54 / 4.61)
+        p_ratio = self.pstar/state.p
+        c = np.sqrt(self.gamma*state.p/state.rho)
+        cstar = c*p_ratio**((self.gamma-1.0)/(2*self.gamma))
+
+        lambda_head = state.u + sgn*c
+        lambda_tail = self.ustar + sgn*cstar
+
+        gam_fac = (self.gamma - 1.0)/(self.gamma + 1.0)
+
+        if (sgn > 0 and xi > lambda_head) or (sgn < 0 and xi < lambda_head):
+            # R/L region
+            solution = state
+
+        elif (sgn > 0 and xi < lambda_tail) or (sgn < 0 and xi > lambda_tail):
+            # * region, we use the isentropic density (Toro 4.53 / 4.60)
+            solution = State(rho = state.rho*p_ratio**(1.0/self.gamma),
+                             u = self.ustar, p = self.pstar)
+
+        else:
+            # we are in the fan -- Toro 4.56 / 4.63
+            rho = state.rho * (2/(self.gamma + 1.0) -
+                               sgn*gam_fac*(state.u - xi)/c)**(2.0/(self.gamma-1.0))
+            u = 2.0/(self.gamma + 1.0) * ( -sgn*c + 0.5*(self.gamma - 1.0)*state.u + xi)
+            p = state.p * (2/(self.gamma + 1.0) -
+                           sgn*gam_fac*(state.u - xi)/c)**(2.0*self.gamma/(self.gamma-1.0))
+            solution = State(rho=rho, u=u, p=p)
+
+        return solution
 
     def sample_solution(self, time, npts, xmin=0.0, xmax=1.0):
         """given the star state (ustar, pstar), sample the solution for npts
         points between xmin and xmax at the given time.
-        
+
         this is a similarity solution in xi = x/t """
 
         # we write it all explicitly out here -- this could be vectorized
@@ -117,65 +188,20 @@ class RiemannProblem(object):
                 state = self.left
                 sgn = -1.0
 
-            p_ratio = self.pstar/state.p
-
-            c = np.sqrt(gam*state.p/state.rho)
-
-            # isentropic (Toro eq. 4.54 / 4.61)
-            cstar = c*p_ratio**((gam-1.0)/(2*gam))
-
-            # is the right wave in our a shock or rarefaction?
+            # is non-contact wave a shock or rarefaction?
             if self.pstar > state.p:
-                # shock
-
-                # Toro, eq. 4.50 / 4.57
-                rhostar = state.rho * (p_ratio + gam_fac)/(gam_fac * p_ratio + 1.0)
-
-                # Toro, eq. 4.52 / 4.59
-                S = state.u + sgn*c*np.sqrt(0.5*(gam + 1.0)/gam*p_ratio + 0.5*(gam - 1.0)/gam)
-
-                # are we to the left or right of the shock?
-                if (sgn > 0 and xi[n] > S) or (sgn < 0 and xi[n] < S):
-                    # R/L region
-                    rho = state.rho
-                    u = state.u
-                    p = state.p
-                else:
-                    # * region
-                    rho = rhostar
-                    u = self.ustar
-                    p = self.pstar
+                # compression! we are a shock
+                solution = self.shock_solution(sgn, xi[n], state)
 
             else:
-                # rarefaction -- the rarefaction is spread out, so
-                # find the speed of the head and tail of the rarefaction fan
-                lambda_head = state.u + sgn*c
-                lambda_tail = self.ustar + sgn*cstar
-
-                if (sgn > 0 and xi[n] > lambda_head) or (sgn < 0 and xi[n] < lambda_head):
-                    # R/L region
-                    rho = state.rho
-                    u = state.u
-                    p = state.p
-
-                elif (sgn > 0 and xi[n] < lambda_tail) or (sgn < 0 and xi[n] > lambda_tail):
-                    # * region
-                    # isentropic density (Toro 4.53 / 4.60)
-                    rho = state.rho*p_ratio**(1.0/gam)
-                    u = self.ustar
-                    p = self.pstar
-
-                else:
-                    # we are in the fan -- Toro 4.56 / 4.63
-                    rho = state.rho * (2/(gam + 1.0) - sgn*gam_fac*(state.u - xi[n])/c)**(2.0/(gam-1.0))
-                    u = 2.0/(gam + 1.0) * ( -sgn*c + 0.5*(gam - 1.0)*state.u + xi[n])
-                    p = state.p * (2/(gam + 1.0) - sgn*gam_fac*(state.u - xi[n])/c)**(2.0*gam/(gam-1.0))
+                # rarefaction
+                solution = self.rarefaction_solution(sgn, xi[n], state)
 
 
             # store
-            rho_v.append(rho)
-            u_v.append(u)
-            p_v.append(p)
+            rho_v.append(solution.rho)
+            u_v.append(solution.u)
+            p_v.append(solution.p)
 
         return x, np.array(rho_v), np.array(u_v), np.array(p_v)
 
