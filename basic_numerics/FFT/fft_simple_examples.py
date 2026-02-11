@@ -82,7 +82,7 @@ def plot_FFT(xx, xmax, f, outfile):
     fk_r = fk.real
     fk_i = fk.imag
 
-    # the fftfreq returns the postive and negative (and 0) frequencies
+    # the fftfreq returns the positive and negative (and 0) frequencies
     # the newer versions of numpy (>=1.8) have an rfftfreq() function
     # that really does what we want -- we'll use that here.
     k = np.fft.rfftfreq(npts)

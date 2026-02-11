@@ -34,7 +34,7 @@ separated by the three characteristics (u - cs, u, u + cs):
    Fry:  Fryxell et al. 2000, ApJS, 131, 273.
 
    Toro: Toro 1999, ``Riemann Solvers and Numerical Methods for Fluid
-         Dynamcs: A Practical Introduction, 2nd Ed.'', Springer-Verlag
+         Dynamcis: A Practical Introduction, 2nd Ed.'', Springer-Verlag
 """
 
 import numpy as np
@@ -107,7 +107,7 @@ def riemann(q_l, q_r, gamma):
     pstar2 = max(smallp, pstar2)
 
     # begin the secant iteration -- see CG Eq. 17 for details.  We will
-    # continue to interate for convergence until the error falls below
+    # continue to iterate for convergence until the error falls below
     # tol (in which case, things are good), or we hit nriem iterations
     # (in which case we have a problem, and we spit out an error).
     has_converged = False
@@ -188,7 +188,7 @@ def riemann(q_l, q_r, gamma):
     else:
         ustar_sgn = 1.0
 
-    # decide which state is located at the zone iterface based on
+    # decide which state is located at the zone interface based on
     # the values of the wave speeds.  This is just saying that if
     # ustar > 0, then the state is U_L.  if ustar < 0, then the
     # state on the axis is U_R.

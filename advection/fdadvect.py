@@ -24,7 +24,7 @@ class FDGrid(object):
         self.ng = ng
         self.nx = nx
 
-        # python is zero-based.  Make easy intergers to know where the
+        # python is zero-based.  Make easy integers to know where the
         # real data lives
         self.ilo = ng
         self.ihi = ng+nx-1

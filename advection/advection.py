@@ -56,7 +56,7 @@ class Grid1d(object):
         self.xmin = xmin
         self.xmax = xmax
 
-        # python is zero-based.  Make easy intergers to know where the
+        # python is zero-based.  Make easy integers to know where the
         # real data lives
         self.ilo = ng
         self.ihi = ng+nx-1
@@ -182,7 +182,7 @@ class Simulation(object):
 
 
         # loop over all the interfaces.  Here, i refers to the left
-        # interface of the zone.  Note that thre are 1 more interfaces
+        # interface of the zone.  Note that there are 1 more interfaces
         # than zones
         al = g.scratch_array()
         ar = g.scratch_array()
